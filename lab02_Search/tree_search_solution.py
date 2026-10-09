@@ -44,180 +44,62 @@ def _result(goal, parent, actions, reached):
     return dict(path=path, actions=moves, reached=reached)
 
 def best_first_search(maze, strategy='BFS', debug=False, vis=False, W=1, animation=False):
-    maze = np.asarray(maze)
-    start, goal = _ends(maze)
-
-    if strategy not in ('BFS', 'DFS', 'GBFS', 'A*'):
-        raise ValueError('Unknown strategy')
-
-    if strategy == 'DFS':
-        return DFS(maze, vis=vis, animation=animation)
-
-    parents = {start: None}
-    acts = {}
-    reached = {start}
-    counter = itertools.count()
-
-    if strategy == 'BFS':
-        frontier = deque([start])
-        pop = frontier.popleft
+    maze=np.asarray(maze);start,goal=_ends(maze)
+    if strategy not in ('BFS','DFS','GBFS','A*'):raise ValueError('Unknown strategy')
+    if strategy=='DFS':return DFS(maze,vis=vis,animation=animation)
+    parents={start:None};acts={};reached={start};counter=itertools.count()
+    if strategy=='BFS':
+        frontier=deque([start]);pop=frontier.popleft
     else:
-        frontier = []
-
-        def score(p, g):
-            return heuristic(p, goal) if strategy == 'GBFS' else g + W * heuristic(p, goal)
-
-        heapq.heappush(frontier, (score(start, 0), -next(counter), 0, start))
-
-    best_g = {start: 0}
-    expanded = set()
-    frames = []
-
-    # Thống kê
-    expanded_count = 0
-    max_frontier = len(frontier)
-
+        frontier=[]
+        def score(p,g):return heuristic(p,goal) if strategy=='GBFS' else g+W*heuristic(p,goal)
+        heapq.heappush(frontier,(score(start,0),-next(counter),0,start))
+    best_g={start:0};expanded=set();frames=[]
     while frontier:
-        if strategy == 'BFS':
-            node = pop()
-            g = best_g[node]
+        if strategy=='BFS':node=pop();g=best_g[node]
         else:
-            _, _, g, node = heapq.heappop(frontier)
-
-            if strategy == 'A*' and g != best_g.get(node):
-                continue
-
-        if node in expanded:
-            continue
-
-        # Kiểm tra đích trước khi mở rộng nút
+            _,_,g,node=heapq.heappop(frontier)
+            if strategy=='A*' and g != best_g.get(node):continue
+        if node in expanded:continue
         expanded.add(node)
-
-        if animation:
-            frames.append((node,))
-
-        if node == goal:
-            result = _result(node, parents, acts, expanded)
-
-            result["expanded_count"] = expanded_count
-            result["max_frontier"] = max_frontier
-
-            if animation:
-                result.update(maze=maze.copy(), frames=frames)
-
-            if vis:
-                show_path(maze, result)
-
+        if animation: frames.append((node,))
+        if node==goal:
+            result=_result(node,parents,acts,expanded)
+            if animation: result.update(maze=maze.copy(), frames=frames)
+            if vis:show_path(maze,result)
             return result
-
-        # Đếm số lần mở rộng nút
-        expanded_count += 1
-
-        for neighbor, move in _neighbors(maze, node):
-            ng = g + 1
-
-            if strategy == 'A*':
-                if ng >= best_g.get(neighbor, float('inf')):
-                    continue
-
-            elif neighbor in reached:
-                continue
-
-            parents[neighbor] = node
-            acts[neighbor] = move
-
-            best_g[neighbor] = ng
-            reached.add(neighbor)
-
-            if strategy == 'BFS':
-                frontier.append(neighbor)
-            else:
-                heapq.heappush(
-                    frontier,
-                    (score(neighbor, ng), -next(counter), ng, neighbor)
-                )
-
-            if strategy == 'A*' and neighbor in expanded:
-                expanded.remove(neighbor)
-
-        max_frontier = max(max_frontier, len(frontier))
-
-    result = _result(None, parents, acts, expanded)
-
-    result["expanded_count"] = expanded_count
-    result["max_frontier"] = max_frontier
-
-    if animation:
-        result.update(maze=maze.copy(), frames=frames)
-
+        for neighbor,move in _neighbors(maze,node):
+            ng=g+1
+            if strategy=='A*':
+                if ng >= best_g.get(neighbor,float('inf')):continue
+            elif neighbor in reached:continue
+            parents[neighbor]=node;acts[neighbor]=move
+            best_g[neighbor]=ng;reached.add(neighbor)
+            if strategy=='BFS':frontier.append(neighbor)
+            else:heapq.heappush(frontier,(score(neighbor,ng),-next(counter),ng,neighbor))
+            if strategy=='A*' and neighbor in expanded: expanded.remove(neighbor)
+    result=_result(None,parents,acts,expanded)
+    if animation: result.update(maze=maze.copy(),frames=frames)
     return result
 
-def DFS(maze, vis=False, max_tries=100000, debug_reached=False,
-        check_cycle=True, limit=None, frontier_option=2, animation=False):
-
-    maze = np.asarray(maze)
-    start, goal = _ends(maze)
-
-    stack = [(start, [start], [])]
-    expanded = set()
-    tries = 0
-    frames = []
-
-    # Thống kê
-    expanded_count = 0
-    max_frontier = len(stack)
-
-    while stack and tries < max_tries:
-        node, path, moves = stack.pop()
-
-        tries += 1
-        expanded.add(node)
-
-        if animation:
-            frames.append((node,))
-
-        if node == goal:
-            result = dict(
-                path=path,
-                actions=moves,
-                reached=expanded,
-                expanded_count=expanded_count,
-                max_frontier=max_frontier
-            )
-
-            if animation:
-                result.update(maze=maze.copy(), frames=frames)
-
-            if vis:
-                show_path(maze, result)
-
+def DFS(maze,vis=False,max_tries=100000,debug_reached=False,check_cycle=True,limit=None,frontier_option=2,animation=False):
+    maze=np.asarray(maze);start,goal=_ends(maze)
+    # Each stack entry carries its own current path to detect path-local cycles.
+    stack=[(start,[start],[])];expanded=set();tries=0;frames=[]
+    while stack and tries<max_tries:
+        node,path,moves=stack.pop();tries+=1;expanded.add(node)
+        if animation: frames.append((node,))
+        if node==goal:
+            result=dict(path=path,actions=moves,reached=expanded)
+            if animation: result.update(maze=maze.copy(),frames=frames)
+            if vis:show_path(maze,result)
             return result
-
-        # Không mở rộng nếu đạt giới hạn độ sâu
-        if limit is not None and len(moves) >= limit:
-            continue
-
-        expanded_count += 1
-
-        for nbr, action in _neighbors(maze, node):
-            if check_cycle and nbr in path:
-                continue
-
-            stack.append((nbr, path + [nbr], moves + [action]))
-
-        max_frontier = max(max_frontier, len(stack))
-
-    result = dict(
-        path=None,
-        actions=None,
-        reached=expanded,
-        expanded_count=expanded_count,
-        max_frontier=max_frontier
-    )
-
-    if animation:
-        result.update(maze=maze.copy(), frames=frames)
-
+        if limit is not None and len(moves)>=limit:continue
+        for nbr,action in _neighbors(maze,node):
+            if check_cycle and nbr in path:continue
+            stack.append((nbr,path+[nbr],moves+[action]))
+    result=dict(path=None,actions=None,reached=expanded)
+    if animation: result.update(maze=maze.copy(),frames=frames)
     return result
 
 def IDS(maze,frontier_option=2,max_tries=100000,vis=False):
@@ -225,7 +107,6 @@ def IDS(maze,frontier_option=2,max_tries=100000,vis=False):
     # A shortest simple path can never have more edges than the number of traversable cells minus one.
     limit_max=int(np.count_nonzero(maze!='X'))
     for limit in range(limit_max+1):
-        print(f"IDS đang thử giới hạn độ sâu: {limit}")
         result=DFS(maze,limit=limit,max_tries=max_tries,frontier_option=frontier_option)
         if result['path'] is not None:
             if vis:show_path(maze,result)
