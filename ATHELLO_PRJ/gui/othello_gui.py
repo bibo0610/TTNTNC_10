@@ -5,6 +5,12 @@ from history.game_replay import GameReplay
 from history.game_history import GameHistory
 from core.othello_engine import get_winner
 from agents.heuristic_agent import heuristic_agent
+from agents.minimax_agent import minimax_agent
+
+AI_AGENTS = {
+    "hva": heuristic_agent,
+    "hvm": minimax_agent,
+}
 
 from core.othello_engine import (
     init_board as create_board,
@@ -21,12 +27,57 @@ from core.othello_engine import (
 
 CELL_SIZE = 50
 
+# Pillow dùng để vẽ quân cờ khử răng cưa (anti-aliasing).
+# Chưa cài thì GUI vẫn chạy, chỉ quay về cách vẽ create_oval cũ.
+try:
+    from PIL import Image, ImageDraw, ImageTk
+    HAS_PIL = True
+except ImportError:
+    HAS_PIL = False
+
+SUPERSAMPLE = 4   # vẽ to gấp 4 lần rồi thu nhỏ -> viền tròn mượt
+
+
+def make_disc_image(size_px, diameter, fill, outline, shadow=True):
+    """Tạo ảnh một quân cờ tròn mượt, nền trong suốt, kích thước size_px x size_px."""
+    s = SUPERSAMPLE
+    big = size_px * s
+    img = Image.new("RGBA", (big, big), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(img)
+
+    x0 = (big - diameter * s) // 2
+    x1 = x0 + diameter * s
+
+    if shadow:   # bóng đổ nhẹ lệch xuống dưới bên phải
+        off = 2 * s
+        draw.ellipse((x0 + off, x0 + off, x1 + off, x1 + off), fill=(0, 0, 0, 90))
+
+    draw.ellipse((x0, x0, x1, x1), fill=fill, outline=outline, width=s)
+
+    # Thu nhỏ bằng bộ lọc LANCZOS: các điểm ở mép được pha màu -> hết răng cưa
+    img = img.resize((size_px, size_px), Image.LANCZOS)
+    return ImageTk.PhotoImage(img)
+
+
 class OthelloGUI:
 
     def __init__(self, root):
 
         self.root = root
         self.root.title("Othello")
+
+        # Ảnh quân cờ và chấm gợi ý (tạo 1 lần, dùng lại mỗi lần vẽ).
+        # Phải giữ trong self, nếu không Python sẽ xóa ảnh và quân bị biến mất.
+        # Màu giữ theo file của bạn: viền quân xám, chấm gợi ý #F7DC6F viền xám.
+        self.piece_images = {}
+        if HAS_PIL:
+            margin = 6
+            diameter = CELL_SIZE - 2 * margin
+            self.piece_images = {
+                BLACK: make_disc_image(CELL_SIZE, diameter, (0, 0, 0), (128, 128, 128)),
+                WHITE: make_disc_image(CELL_SIZE, diameter, (255, 255, 255), (128, 128, 128)),
+                "hint": make_disc_image(CELL_SIZE, 10, (247, 220, 111), (128, 128, 128), shadow=False),
+            }
 
         self.board = create_board()
 
@@ -99,6 +150,11 @@ class OthelloGUI:
             variable=self.mode, value="hva",
             command=self.change_mode
         ).pack(side="left", padx=10)
+        tk.Radiobutton(
+            self.mode_frame, text="Human vs Minimax (bạn: Đen)",
+            variable=self.mode, value="hvm",
+            command=self.change_mode
+        ).pack(side="left", padx=10)
 
         self.restart_button = tk.Button(
             root,
@@ -162,7 +218,7 @@ class OthelloGUI:
                     y1,
                     x2,
                     y2,
-                    fill="#228B22",
+                    fill="#009067",
                     outline="black"
                 )
 
@@ -180,13 +236,17 @@ class OthelloGUI:
             x = col * CELL_SIZE + CELL_SIZE / 2
             y = row * CELL_SIZE + CELL_SIZE / 2
 
+            if self.piece_images:
+                self.canvas.create_image(x, y, image=self.piece_images["hint"])
+                continue
+
             self.canvas.create_oval(
                 x - 5,
                 y - 5,
                 x + 5,
                 y + 5,
-                fill="yellow",
-                outline=""
+                fill="#F7DC6F",
+                outline="gray"
             )
 
         # -------------------------
@@ -202,6 +262,12 @@ class OthelloGUI:
                 value = self.board[row][col]
 
                 if value == EMPTY:
+                    continue
+
+                if self.piece_images:
+                    cx = col * CELL_SIZE + CELL_SIZE / 2
+                    cy = row * CELL_SIZE + CELL_SIZE / 2
+                    self.canvas.create_image(cx, cy, image=self.piece_images[value])
                     continue
 
                 x1 = col * CELL_SIZE + margin
@@ -221,7 +287,7 @@ class OthelloGUI:
                     x2,
                     y2,
                     fill=color,
-                    outline="black"
+                    outline="gray"
                 )
 
         self.update_info()
@@ -236,7 +302,7 @@ class OthelloGUI:
     def handle_click(self, event):
         if self.replay is not None or is_game_over(self.board):
             return
-        if self.mode.get() == "hva" and self.player == WHITE:
+        if self.mode.get() in AI_AGENTS and self.player == WHITE:
             return  # Không cho người chơi đi thay AI.
 
         col = event.x // CELL_SIZE
@@ -290,16 +356,17 @@ class OthelloGUI:
 
     def schedule_ai(self):
         self.cancel_ai_job()
-        if (self.mode.get() == "hva" and self.replay is None
+        if (self.mode.get() in AI_AGENTS and self.replay is None
                 and self.player == WHITE and not is_game_over(self.board)):
             self.ai_job = self.root.after(250, self.ai_move)
 
     def ai_move(self):
         self.ai_job = None
-        if (self.mode.get() != "hva" or self.replay is not None
+        if (self.mode.get() not in AI_AGENTS or self.replay is not None
                 or self.player != WHITE or is_game_over(self.board)):
             return
-        action = heuristic_agent(self.board, WHITE)
+        agent = AI_AGENTS[self.mode.get()]
+        action = agent(self.board, WHITE)
         if action is None:
             # Đường phòng vệ cho trạng thái PASS, không dự kiến xảy ra
             # sau after_move() nhưng giúp code ổn định khi mở rộng.
@@ -480,7 +547,18 @@ Trắng: {white}
 # MAIN
 # =========================
 
+def enable_high_dpi():
+    """Trên Windows có đặt Scale 125%/150%, Tk bị phóng to kiểu ảnh bitmap nên nhòe
+    và răng cưa. Báo cho Windows biết app tự xử lý DPI để vẽ sắc nét."""
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except Exception:
+        pass   # không phải Windows hoặc Windows quá cũ -> bỏ qua
+
+
 def run_gui():
+    enable_high_dpi()
     root = tk.Tk()
     OthelloGUI(root)
     root.mainloop()
