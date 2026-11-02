@@ -1,0 +1,20 @@
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor
+.vscode/
+
+# Generated game logs
+game_logs/*.json
+!game_logs/.gitkeep
+
+# Operating system
+.DS_Store
+Thumbs.db
