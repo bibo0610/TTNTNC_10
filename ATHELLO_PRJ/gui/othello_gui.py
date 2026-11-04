@@ -6,10 +6,12 @@ from history.game_history import GameHistory
 from core.othello_engine import get_winner
 from agents.heuristic_agent import heuristic_agent
 from agents.minimax_agent import minimax_agent
+from agents.cnn_agent import cnn_agent
 
 AI_AGENTS = {
     "hva": heuristic_agent,
     "hvm": minimax_agent,
+    "hvcnn": cnn_agent,
 }
 
 from core.othello_engine import (
@@ -153,6 +155,11 @@ class OthelloGUI:
         tk.Radiobutton(
             self.mode_frame, text="Human vs Minimax (bạn: Đen)",
             variable=self.mode, value="hvm",
+            command=self.change_mode
+        ).pack(side="left", padx=10)
+        tk.Radiobutton(
+            self.mode_frame, text="Human vs CNN(Heuristic) (bạn: Đen)",
+            variable=self.mode, value="hvcnn",
             command=self.change_mode
         ).pack(side="left", padx=10)
 
@@ -366,6 +373,14 @@ class OthelloGUI:
                 or self.player != WHITE or is_game_over(self.board)):
             return
         agent = AI_AGENTS[self.mode.get()]
+        try:
+            action = agent(self.board, WHITE)
+        except (OSError, RuntimeError, ValueError, KeyError) as exc:
+            # A missing/incompatible CNN checkpoint must not crash the GUI.
+            messagebox.showerror("Không chạy được AI", str(exc))
+            self.mode.set("hvh")
+            self.restart_game()
+            return
         action = agent(self.board, WHITE)
         if action is None:
             # Đường phòng vệ cho trạng thái PASS, không dự kiến xảy ra
