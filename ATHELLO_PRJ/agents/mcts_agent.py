@@ -189,14 +189,14 @@ class MCTSNode:
         return child
 
     
-    def selection(root, exploration_constant=math.sqrt(2)):
+    def selection(seft, exploration_constant=math.sqrt(2)):
         """
         Đi từ Root xuống cây bằng UCT.
 
         Trả về nút được chọn để tiếp tục Expansion.
         """
 
-        node = root
+        node = seft
 
         while not node.is_terminal():
 
@@ -292,3 +292,60 @@ def backpropagation(node, winner):
 
         # Chuyển lên nút cha
         current = current.parent
+
+def mcts_agent(board, player, simulations=1000):
+    """
+    Agent sử dụng Monte Carlo Tree Search (MCTS)
+    để lựa chọn nước đi.
+
+    Tham số:
+        board: Bàn cờ hiện tại.
+        player: Người chơi hiện tại (black hoặc white).
+        simulations: Số lần mô phỏng.
+
+    Trả về:
+        (row, col): Nước đi được lựa chọn.
+        None: Nếu người chơi không có nước đi hợp lệ.
+    """
+
+    if simulations <= 0:
+        raise ValueError("simulations must be greater than 0")
+    
+    # 1. Lấy các nước đi hợp lệ
+    valid_moves = get_valid_moves(board, player)
+
+    # Không có nước đi thì PASS
+    if not valid_moves:
+        return None
+
+    # 2. Tạo nút gốc
+    root = MCTSNode(
+        board=board,
+        player_to_move=player
+    )
+
+    # 3. Thực hiện MCTS nhiều lần
+    for _ in range(simulations):
+
+        # BƯỚC 1: SELECTION
+        node = root.selection()
+
+        # BƯỚC 2: EXPANSION
+        if not node.is_terminal():
+            if not node.is_fully_expanded():
+                node = node.expand()
+
+        # BƯỚC 3: SIMULATION
+        winner = simulation(node)
+
+        # BƯỚC 4: BACKPROPAGATION
+        backpropagation(node, winner)
+
+    # 4. Chọn nút con được thăm nhiều nhất
+    best_child = max(
+        root.children,
+        key=lambda child: child.visits
+    )
+
+    # 5. Trả về nước đi tốt nhất
+    return best_child.move
