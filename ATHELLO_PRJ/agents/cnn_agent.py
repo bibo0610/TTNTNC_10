@@ -7,6 +7,7 @@ from torch import nn
 from core.othello_engine import get_valid_moves
 
 DEFAULT_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_policy.pt"
+MINIMAX_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v2_minimax.pt"
 
 
 def encode_state(board, player):
@@ -89,3 +90,16 @@ def cnn_agent(board, player):
     if not get_valid_moves(board, player):
         return None
     return _default_cnn_agent()(board, player)
+
+
+@lru_cache(maxsize=1)
+def _minimax_cnn_agent():
+    """Load V2 once, independently of the original heuristic-trained CNN."""
+    return CNNAgent(MINIMAX_CHECKPOINT)
+
+
+def cnn_minimax_agent(board, player):
+    """CNN V2 trained on Minimax labels. Same API as other agents."""
+    if not get_valid_moves(board, player):
+        return None
+    return _minimax_cnn_agent()(board, player)

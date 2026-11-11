@@ -6,12 +6,13 @@ from history.game_history import GameHistory
 from core.othello_engine import get_winner
 from agents.heuristic_agent import heuristic_agent
 from agents.minimax_agent import minimax_agent
-from agents.cnn_agent import cnn_agent
+from agents.cnn_agent import cnn_agent, cnn_minimax_agent
 
 AI_AGENTS = {
     "hva": heuristic_agent,
     "hvm": minimax_agent,
     "hvcnn": cnn_agent,
+    "hvcnnminimax": cnn_minimax_agent,
 }
 
 from core.othello_engine import (
@@ -162,6 +163,11 @@ class OthelloGUI:
             variable=self.mode, value="hvcnn",
             command=self.change_mode
         ).pack(side="left", padx=10)
+        tk.Radiobutton(
+            self.mode_frame, text="Human vs CNN(Minimax) (bạn: Đen)",
+            variable=self.mode, value="hvcnnminimax",
+            command=self.change_mode
+        ).pack(anchor="w")
 
         self.restart_button = tk.Button(
             root,
@@ -381,7 +387,6 @@ class OthelloGUI:
             self.mode.set("hvh")
             self.restart_game()
             return
-        action = agent(self.board, WHITE)
         if action is None:
             # Đường phòng vệ cho trạng thái PASS, không dự kiến xảy ra
             # sau after_move() nhưng giúp code ổn định khi mở rộng.
