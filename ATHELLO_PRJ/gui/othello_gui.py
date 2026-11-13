@@ -6,13 +6,14 @@ from history.game_history import GameHistory
 from core.othello_engine import get_winner
 from agents.heuristic_agent import heuristic_agent
 from agents.minimax_agent import minimax_agent
-from agents.cnn_agent import cnn_agent, cnn_minimax_agent
+from agents.cnn_agent import cnn_agent, cnn_minimax_agent, cnn_mcts_agent
 
 AI_AGENTS = {
     "hva": heuristic_agent,
     "hvm": minimax_agent,
     "hvcnn": cnn_agent,
     "hvcnnminimax": cnn_minimax_agent,
+    "hvcnnmcts": cnn_mcts_agent,
 }
 
 from core.othello_engine import (
@@ -166,6 +167,11 @@ class OthelloGUI:
         tk.Radiobutton(
             self.mode_frame, text="Human vs CNN(Minimax) (bạn: Đen)",
             variable=self.mode, value="hvcnnminimax",
+            command=self.change_mode
+        ).pack(anchor="w")
+        tk.Radiobutton(
+            self.mode_frame, text="Human vs CNN(MCTS) (bạn: Đen)",
+            variable=self.mode, value="hvcnnmcts",
             command=self.change_mode
         ).pack(anchor="w")
 

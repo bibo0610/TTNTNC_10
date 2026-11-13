@@ -1,4 +1,4 @@
-"""Evaluate CNN policy against heuristic and random, alternating colours."""
+"""Evaluate CNN policy against CNN and random, alternating colours."""
 import argparse
 import random
 from agents.cnn_agent import CNNAgent

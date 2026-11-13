@@ -8,6 +8,7 @@ from core.othello_engine import get_valid_moves
 
 DEFAULT_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_policy.pt"
 MINIMAX_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v2_minimax.pt"
+MCTS_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v3_mcts.pt"
 
 
 def encode_state(board, player):
@@ -103,3 +104,16 @@ def cnn_minimax_agent(board, player):
     if not get_valid_moves(board, player):
         return None
     return _minimax_cnn_agent()(board, player)
+
+
+@lru_cache(maxsize=1)
+def _mcts_cnn_agent():
+    """Load V3 once, independently of V1 and V2."""
+    return CNNAgent(MCTS_CHECKPOINT)
+
+
+def cnn_mcts_agent(board, player):
+    """CNN V3 trained on MCTS labels; (board, player) -> move or None."""
+    if not get_valid_moves(board, player):
+        return None
+    return _mcts_cnn_agent()(board, player)
