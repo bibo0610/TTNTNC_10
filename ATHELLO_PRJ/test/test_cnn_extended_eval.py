@@ -1,5 +1,5 @@
 from collections import Counter
-from scripts.evaluate_cnn_extended import make_opening, play_from, evaluate
+from scripts.evaluate_cnn import make_opening, play_from, evaluate
 from core.othello_engine import init_board, get_valid_moves, black, white
 
 
