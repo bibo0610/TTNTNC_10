@@ -7,7 +7,7 @@ import torch
 from agents.cnn_agent import CNNPolicy
 from core.othello_engine import get_valid_moves, init_board
 from scripts.generate_cnn_data import generate
-from scripts.evaluate_cnn_extended import evaluate
+from scripts.evaluate_cnn import evaluate
 from agents.mcts_agent import mcts_agent
 
 
