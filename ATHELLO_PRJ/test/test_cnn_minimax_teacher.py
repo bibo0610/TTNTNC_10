@@ -1,7 +1,7 @@
 """CNN V2 tests: Minimax teacher and separate GUI entry point."""
 import numpy as np
 import pytest
-import torch
+import torch 
 
 from agents.cnn_agent import CNNPolicy, cnn_minimax_agent, _minimax_cnn_agent
 from core.othello_engine import get_valid_moves, init_board
