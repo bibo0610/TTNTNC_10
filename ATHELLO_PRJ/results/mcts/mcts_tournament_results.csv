@@ -1,0 +1,4 @@
+﻿run_id,date_time,simulations,games,mcts_wins,random_wins,draws,win_rate_percent,total_mcts_moves,total_thinking_time_seconds,average_decision_time_seconds
+20261113_171447,2026-11-13T17:16:03,100,4,4,0,0,100.0,120,75.3061,0.6276
+20261113_171447,2026-11-13T17:21:16,500,4,4,0,0,100.0,120,301.6329,2.5136
+20261113_171447,2026-11-13T17:33:40,1000,4,4,0,0,100.0,122,731.4672,5.9956

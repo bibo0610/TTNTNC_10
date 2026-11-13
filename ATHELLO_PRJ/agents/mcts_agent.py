@@ -349,3 +349,6 @@ def mcts_agent(board, player, simulations=1000):
 
     # 5. Trả về nước đi tốt nhất
     return best_child.move
+
+def agent(board, player):
+    return mcts_agent(board, player, simulations=1000)
