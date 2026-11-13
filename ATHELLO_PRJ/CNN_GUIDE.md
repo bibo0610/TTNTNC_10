@@ -3,10 +3,18 @@
 Mở terminal tại thư mục gốc `ATHELLO_PRJ` (nơi chứa `main.py`). Cần Python 3.10+.
 
 ```powershell
+Cài thư viện
 python -m pip install -r requirements-cnn.txt
-python -m scripts.generate_cnn_data --games 200 --epsilon 0.15
-python -m scripts.train_cnn --epochs 20 --batch-size 128
-python -m scripts.evaluate_cnn --games 40
+Sinh du lieu huan luyen:
+- Heuritic: python -m scripts.generate_cnn_data --games 200 --epsilon 0.15
+- Minimax: python -m scripts.generate_cnn_data --teacher minimax --minimax-depth 3 --games 100 --seed 42 --out data/cnn_v2_minimax.npz
+Huấn luyện:
+- Heuristic: python -m scripts.train_cnn --epochs 20 --batch-size 128
+- Minimax: python -m scripts.train_cnn --data data/cnn_v2_minimax.npz --out checkpoints/cnn_v2_minimax.pt --epochs 20 --seed 42
+Đánh giá mô hình:
+- Heuristic: python -m scripts.evaluate_cnn --games 40
+- Minimax: python -m scripts.evaluate_cnn --checkpoint checkpoints/cnn_v2_minimax.pt --games 40 --seed 42
+Test nhanh:
 python -m pytest test/ -q
 python main.py
 ```
