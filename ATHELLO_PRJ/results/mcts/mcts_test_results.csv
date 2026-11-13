@@ -1,0 +1,52 @@
+﻿Test Name,Status,Duration (seconds),Message,Timestamp
+__main__.TestMCTS.test_black_move_is_legal,PASS,0.199781,,2026-11-13 18:47:16
+__main__.TestMCTS.test_expansion_handles_pass,PASS,0.000317,,2026-11-13 18:47:16
+__main__.TestMCTS.test_invalid_simulation_count,PASS,0.000318,,2026-11-13 18:47:16
+__main__.TestMCTS.test_original_board_is_unchanged,PASS,0.197611,,2026-11-13 18:47:16
+__main__.TestMCTS.test_pass_returns_none,PASS,0.000507,,2026-11-13 18:47:16
+__main__.TestMCTS.test_simulation_count,PASS,0.02521,,2026-11-13 18:47:16
+__main__.TestMCTS.test_simulation_handles_pass,PASS,0.000446,,2026-11-13 18:47:16
+__main__.TestMCTS.test_terminal_board_returns_none,PASS,0.000229,,2026-11-13 18:47:16
+__main__.TestMCTS.test_white_move_is_legal,PASS,0.210488,,2026-11-13 18:47:16
+
+SUMMARY
+Total tests,9
+Passed,9
+Failed,0
+Errors,0
+Skipped,0
+Overall result,PASS
+__main__.TestMCTS.test_black_move_is_legal,PASS,0.281972,,2026-11-13 18:52:12
+__main__.TestMCTS.test_expansion_handles_pass,PASS,0.00041,,2026-11-13 18:52:12
+__main__.TestMCTS.test_invalid_simulation_count,PASS,0.000287,,2026-11-13 18:52:12
+__main__.TestMCTS.test_original_board_is_unchanged,PASS,0.277083,,2026-11-13 18:52:12
+__main__.TestMCTS.test_pass_returns_none,PASS,0.000326,,2026-11-13 18:52:12
+__main__.TestMCTS.test_simulation_count,PASS,0.033502,,2026-11-13 18:52:12
+__main__.TestMCTS.test_simulation_handles_pass,PASS,0.000445,,2026-11-13 18:52:12
+__main__.TestMCTS.test_terminal_board_returns_none,PASS,0.000216,,2026-11-13 18:52:12
+__main__.TestMCTS.test_white_move_is_legal,PASS,0.247432,,2026-11-13 18:52:12
+
+SUMMARY
+Total tests,9
+Passed,9
+Failed,0
+Errors,0
+Skipped,0
+Overall result,PASS
+__main__.TestMCTS.test_black_move_is_legal,PASS,0.27893,,2026-11-13 18:53:03
+__main__.TestMCTS.test_expansion_handles_pass,PASS,0.000364,,2026-11-13 18:53:03
+__main__.TestMCTS.test_invalid_simulation_count,PASS,0.000214,,2026-11-13 18:53:03
+__main__.TestMCTS.test_original_board_is_unchanged,PASS,0.235832,,2026-11-13 18:53:03
+__main__.TestMCTS.test_pass_returns_none,PASS,0.000274,,2026-11-13 18:53:03
+__main__.TestMCTS.test_simulation_count,PASS,0.030153,,2026-11-13 18:53:03
+__main__.TestMCTS.test_simulation_handles_pass,PASS,0.000726,,2026-11-13 18:53:03
+__main__.TestMCTS.test_terminal_board_returns_none,PASS,0.000221,,2026-11-13 18:53:03
+__main__.TestMCTS.test_white_move_is_legal,PASS,0.241015,,2026-11-13 18:53:03
+
+SUMMARY
+Total tests,9
+Passed,9
+Failed,0
+Errors,0
+Skipped,0
+Overall result,PASS
