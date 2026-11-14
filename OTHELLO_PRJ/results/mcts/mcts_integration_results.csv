@@ -1,2 +1,4 @@
 ﻿timestamp,agent,opponent,simulations,winner,black_pieces,white_pieces,elapsed_seconds,result
 2026-11-14 07:35:28,MCTS,Random,1000,1,54,10,185.97,PASS
+2026-11-14 12:16:20,MCTS,Random,1000,1,44,20,166.53,PASS
+2026-11-14 12:32:09,MCTS,Random,1000,1,48,16,294.28,PASS

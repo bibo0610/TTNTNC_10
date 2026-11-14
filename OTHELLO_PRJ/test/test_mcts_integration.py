@@ -184,8 +184,6 @@ def test_mcts_integration():
             result="PASS"
         )
 
-        return True
-
     except Exception as error:
 
         elapsed = time.perf_counter() - start_time
@@ -212,14 +210,15 @@ def test_mcts_integration():
 # =========================================================
 
 if __name__ == "__main__":
+    try:
+        test_mcts_integration()
 
-    success = test_mcts_integration()
-
-    print("\n" + "=" * 60)
-
-    if success:
+        print("\n" + "=" * 60)
         print("OVERALL RESULT: PASS")
-    else:
-        print("OVERALL RESULT: FAIL")
+        print("=" * 60)
 
-    print("=" * 60)
+    except Exception:
+        print("\n" + "=" * 60)
+        print("OVERALL RESULT: FAIL")
+        print("=" * 60)
+        raise
