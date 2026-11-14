@@ -74,7 +74,7 @@ def create_initial_board():
 # 4. KIEM TRA TREN MOT BAN CO
 # ==========================================
 
-def test_single_position(simulations):
+def run_single_position(simulations):
     board = create_initial_board()
     valid_moves = get_valid_moves(board, black)
 
@@ -279,7 +279,7 @@ def main():
 
         # A. Kiem tra tren mot ban co
         print("\n[1] SINGLE POSITION TEST")
-        test_single_position(simulations)
+        run_single_position(simulations)
 
         # B. Tournament
         print("\n[2] TOURNAMENT: MCTS VS RANDOM")
