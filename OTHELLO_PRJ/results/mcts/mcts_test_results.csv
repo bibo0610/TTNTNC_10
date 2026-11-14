@@ -50,3 +50,20 @@ Failed,0
 Errors,0
 Skipped,0
 Overall result,PASS
+__main__.TestMCTS.test_black_move_is_legal,PASS,0.270936,,2026-11-14 13:21:19
+__main__.TestMCTS.test_expansion_handles_pass,PASS,0.000294,,2026-11-14 13:21:19
+__main__.TestMCTS.test_invalid_simulation_count,PASS,0.000205,,2026-11-14 13:21:19
+__main__.TestMCTS.test_original_board_is_unchanged,PASS,0.232811,,2026-11-14 13:21:19
+__main__.TestMCTS.test_pass_returns_none,PASS,0.000458,,2026-11-14 13:21:19
+__main__.TestMCTS.test_simulation_count,PASS,0.023963,,2026-11-14 13:21:19
+__main__.TestMCTS.test_simulation_handles_pass,PASS,0.000378,,2026-11-14 13:21:19
+__main__.TestMCTS.test_terminal_board_returns_none,PASS,0.000183,,2026-11-14 13:21:19
+__main__.TestMCTS.test_white_move_is_legal,PASS,0.241618,,2026-11-14 13:21:19
+
+SUMMARY
+Total tests,9
+Passed,9
+Failed,0
+Errors,0
+Skipped,0
+Overall result,PASS
