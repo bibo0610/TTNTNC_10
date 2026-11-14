@@ -6,7 +6,7 @@ import torch
 from torch import nn
 from core.othello_engine import get_valid_moves
 
-DEFAULT_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_policy.pt"
+DEFAULT_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v1_heuristic.pt"
 MINIMAX_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v2_minimax.pt"
 MCTS_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v3_mcts.pt"
 
