@@ -21,6 +21,42 @@ def sha256_file(path):
     return digest.hexdigest()
 
 
+def split_by_source_game(ids, seed, val_split, teacher_ids=None):
+    """Stratify game-level holdouts per teacher when provenance is available."""
+    rng = np.random.default_rng(seed)
+    validation = np.zeros(len(ids), dtype=np.bool_)
+    if teacher_ids is None:
+        game_ids = np.unique(ids)
+        if len(game_ids) < 2:
+            raise ValueError("Need at least 2 games for validation")
+        rng.shuffle(game_ids)
+        count = max(1, min(len(game_ids) - 1, int(round(len(game_ids) * val_split))))
+        validation = np.isin(ids, game_ids[:count])
+        return validation
+    for tid in np.unique(teacher_ids):
+        within = teacher_ids == tid
+        groups = np.unique(ids[within])
+        if len(groups) < 2:
+            raise ValueError(f"Teacher {tid}: need at least 2 games for validation")
+        rng.shuffle(groups)
+        count = max(1, min(len(groups) - 1, int(round(len(groups) * val_split))))
+        validation |= within & np.isin(ids, groups[:count])
+    return validation
+
+
+def exclude_train_overlaps(states, train_select, val_select):
+    """Remove (not move) validation states that occur verbatim in training."""
+    train_keys = {np.ascontiguousarray(s).tobytes() for s in states[train_select]}
+    to_check = np.flatnonzero(val_select)
+    overlap = np.fromiter((np.ascontiguousarray(states[i]).tobytes() in train_keys
+                           for i in to_check), dtype=np.bool_, count=len(to_check))
+    val_select = val_select.copy()
+    val_select[to_check[overlap]] = False
+    if not val_select.any():
+        raise ValueError("All validation states overlap training; cannot validate")
+    return val_select, int(overlap.sum())
+
+
 def train(args):
     """Train from scratch; save only the epoch with lowest validation loss."""
     data_path = Path(args.data)
@@ -44,6 +80,7 @@ def train(args):
         y = data["labels"].copy()
         masks = data["masks"].copy()
         ids = data["game_ids"].copy()
+        teacher_ids = data["teacher_ids"].copy() if "teacher_ids" in data.files else None
 
     if (x.ndim != 4 or x.shape[1:] != (3, 8, 8)
             or y.shape != (len(x),) or masks.shape != (len(x), 64)
@@ -55,12 +92,16 @@ def train(args):
         raise ValueError("Dataset contains out-of-range or illegal teacher actions")
 
     game_ids = np.unique(ids)
-    if len(game_ids) < 2:
-        raise ValueError("Need at least 2 games to split train/validation")
-    rng = np.random.default_rng(args.seed)
-    rng.shuffle(game_ids)
-    val_count = max(1, min(len(game_ids) - 1, int(round(len(game_ids) * args.val_split))))
-    validation = np.isin(ids, game_ids[:val_count])
+    if teacher_ids is not None and (teacher_ids.shape != ids.shape or
+                                      not np.issubdtype(teacher_ids.dtype, np.integer)):
+        raise ValueError("Invalid teacher_ids field")
+    validation = split_by_source_game(ids, args.seed, args.val_split, teacher_ids)
+    train_select = ~validation
+    val_select = validation.copy()
+    removed_overlaps = 0
+    if args.drop_shared_val_states:
+        val_select, removed_overlaps = exclude_train_overlaps(x, train_select, val_select)
+        print(f"Removed {removed_overlaps} validation examples sharing an exact training state")
 
     def make_loader(select, shuffle):
         idx = np.flatnonzero(select)
@@ -71,8 +112,8 @@ def train(args):
         )
         return DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle)
 
-    train_loader = make_loader(~validation, shuffle=True)
-    val_loader = make_loader(validation, shuffle=False)
+    train_loader = make_loader(train_select, shuffle=True)
+    val_loader = make_loader(val_select, shuffle=False)
     device = torch.device(args.device)
     if device.type == "cuda" and not torch.cuda.is_available():
         raise ValueError("CUDA is not available on this machine. Use --device cpu.")
@@ -90,9 +131,13 @@ def train(args):
         "batch_size": args.batch_size, "lr": args.lr,
         "weight_decay": args.weight_decay, "val_split": args.val_split,
         "seed": args.seed, "device": str(device),
-        "train_samples": int((~validation).sum()),
-        "val_samples": int(validation.sum()),
-        "train_games": int(len(game_ids) - val_count), "val_games": int(val_count),
+        "train_samples": int(train_select.sum()),
+        "val_samples": int(val_select.sum()),
+        "train_games": int(len(np.unique(ids[train_select]))),
+        "val_games": int(len(np.unique(ids[val_select]))),
+        "source_stratified": bool(teacher_ids is not None),
+        "drop_shared_val_states": bool(args.drop_shared_val_states),
+        "dropped_val_overlaps": int(removed_overlaps),
         "augmentation": "random_d4_train_only" if args.augment_d4 else "none",
     }
     dataset_sha256 = sha256_file(data_path)
@@ -159,6 +204,8 @@ def main():
     ap.add_argument("--device", default="cpu", help="cpu or cuda")
     ap.add_argument("--augment-d4", action="store_true",
                     help="Apply random D4 board symmetry to TRAIN batches only (V3.2)")
+    ap.add_argument("--drop-shared-val-states", action="store_true",
+                    help="Discard exact duplicate validation states also present in training (recommended for V4)")
     ap.add_argument("--overwrite", action="store_true",
                     help="Explicitly replace the checkpoint at --out")
     args = ap.parse_args()
