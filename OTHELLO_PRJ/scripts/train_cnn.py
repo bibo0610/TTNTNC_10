@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import torch
 from torch import nn
+from torch.nn import functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
 from agents.cnn_agent import CNNPolicy, masked_logits
@@ -57,6 +58,37 @@ def exclude_train_overlaps(states, train_select, val_select):
     return val_select, int(overlap.sum())
 
 
+
+def weighted_teacher_ce(logits, labels, teacher_ids, teacher_weights):
+    """Weighted supervised loss, normalized by sum of sample weights.
+
+    teacher_weights has exactly three positive values for
+    0=Heuristic, 1=Minimax, 2=MCTS. None reproduces ordinary CE.
+    The normalization means 0.6/1.5/0.9 and 0.2/0.5/0.3 are equivalent.
+    """
+    per_sample = F.cross_entropy(logits, labels, reduction="none")
+    if teacher_weights is None:
+        return per_sample.mean()
+    weights = teacher_weights[teacher_ids.long()]
+    return (per_sample * weights).sum() / weights.sum()
+
+
+def validate_teacher_weights(teacher_weights, teacher_ids):
+    """Validate provenance before giving any source more influence."""
+    if teacher_weights is None:
+        return None
+    if teacher_ids is None:
+        raise ValueError("--teacher-weights requires dataset field teacher_ids (build V4 dataset first)")
+    weights = np.asarray(teacher_weights, dtype=np.float64)
+    if weights.shape != (3,) or not np.isfinite(weights).all() or (weights <= 0).any():
+        raise ValueError("--teacher-weights must provide exactly 3 finite, positive numbers")
+    if not np.isin(teacher_ids, (0, 1, 2)).all():
+        raise ValueError("teacher_ids must be 0=Heuristic, 1=Minimax, 2=MCTS")
+    counts = np.bincount(teacher_ids.astype(np.int64), minlength=3)
+    if (counts == 0).any():
+        raise ValueError("Weighted Multi-Teacher requires samples from all three teachers")
+    return weights
+
 def train(args):
     """Train from scratch; save only the epoch with lowest validation loss."""
     data_path = Path(args.data)
@@ -95,6 +127,7 @@ def train(args):
     if teacher_ids is not None and (teacher_ids.shape != ids.shape or
                                       not np.issubdtype(teacher_ids.dtype, np.integer)):
         raise ValueError("Invalid teacher_ids field")
+    source_weights = validate_teacher_weights(getattr(args, "teacher_weights", None), teacher_ids)
     validation = split_by_source_game(ids, args.seed, args.val_split, teacher_ids)
     train_select = ~validation
     val_select = validation.copy()
@@ -105,11 +138,14 @@ def train(args):
 
     def make_loader(select, shuffle):
         idx = np.flatnonzero(select)
-        dataset = TensorDataset(
+        tensors = [
             torch.from_numpy(x[idx].astype(np.float32)),
             torch.from_numpy(y[idx].astype(np.int64)),
             torch.from_numpy(masks[idx].astype(np.bool_)),
-        )
+        ]
+        if source_weights is not None:
+            tensors.append(torch.from_numpy(teacher_ids[idx].astype(np.int64)))
+        dataset = TensorDataset(*tensors)
         return DataLoader(dataset, batch_size=args.batch_size, shuffle=shuffle)
 
     train_loader = make_loader(train_select, shuffle=True)
@@ -120,7 +156,9 @@ def train(args):
 
     model = CNNPolicy().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss()  # validation remains unweighted, as in V4.0
+    teacher_weights_tensor = (torch.tensor(source_weights, dtype=torch.float32, device=device)
+                              if source_weights is not None else None)
     best_loss = float("inf")
     best_epoch = 0
     stale_epochs = 0
@@ -139,36 +177,52 @@ def train(args):
         "drop_shared_val_states": bool(args.drop_shared_val_states),
         "dropped_val_overlaps": int(removed_overlaps),
         "augmentation": "random_d4_train_only" if args.augment_d4 else "none",
+        "teacher_weights": source_weights.tolist() if source_weights is not None else None,
+        "teacher_order": ["heuristic", "minimax", "mcts"] if source_weights is not None else None,
+        "validation_loss": "unweighted_cross_entropy",
     }
     dataset_sha256 = sha256_file(data_path)
     print(f"Augmentation: {config['augmentation']}; validation remains unchanged")
+    if source_weights is not None:
+        counts = np.bincount(teacher_ids[train_select], minlength=3)
+        proportions = (counts * source_weights) / np.sum(counts * source_weights)
+        print(f"Teacher weights [Heuristic, Minimax, MCTS]: {source_weights.tolist()}")
+        print(f"Train teacher counts: {counts.tolist()}; weighted contribution: {proportions.round(4).tolist()}")
+        print("Training: weighted Cross-Entropy; validation: ordinary Cross-Entropy")
 
     for epoch in range(1, args.epochs + 1):
         model.train()
-        train_sum, seen = 0.0, 0
-        for xb, yb, mb in train_loader:
-            xb, yb, mb = xb.to(device), yb.to(device), mb.to(device)
+        train_sum, train_weight_sum, seen = 0.0, 0.0, 0
+        for batch in train_loader:
+            xb, yb, mb = (v.to(device) for v in batch[:3])
+            tids = batch[3].to(device) if teacher_weights_tensor is not None else None
             if args.augment_d4:
                 xb, yb, mb = augment_d4_batch(xb, yb, mb)
-            loss = criterion(masked_logits(model(xb), mb), yb)
+            logits = masked_logits(model(xb), mb)
+            loss = weighted_teacher_ce(logits, yb, tids, teacher_weights_tensor)
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-            train_sum += loss.item() * len(xb)
+            if teacher_weights_tensor is None:
+                batch_weight = float(len(xb))
+            else:
+                batch_weight = teacher_weights_tensor[tids].sum().item()
+            train_sum += loss.item() * batch_weight
+            train_weight_sum += batch_weight
             seen += len(xb)
 
         model.eval()
         val_sum, correct, total = 0.0, 0, 0
         with torch.no_grad():
-            for xb, yb, mb in val_loader:
-                xb, yb, mb = xb.to(device), yb.to(device), mb.to(device)
+            for batch in val_loader:
+                xb, yb, mb = (v.to(device) for v in batch[:3])
                 logits = masked_logits(model(xb), mb)
                 val_sum += criterion(logits, yb).item() * len(xb)
                 correct += (logits.argmax(dim=1) == yb).sum().item()
                 total += len(xb)
         val_loss = val_sum / total
         val_accuracy = correct / total
-        print(f"Epoch {epoch:03d} | train_loss={train_sum/seen:.4f} | "
+        print(f"Epoch {epoch:03d} | train_loss={train_sum/train_weight_sum:.4f} | "
               f"val_loss={val_loss:.4f} | val_accuracy={val_accuracy:.2%}")
 
         if val_loss < best_loss - 1e-6:
@@ -206,12 +260,18 @@ def main():
                     help="Apply random D4 board symmetry to TRAIN batches only (V3.2)")
     ap.add_argument("--drop-shared-val-states", action="store_true",
                     help="Discard exact duplicate validation states also present in training (recommended for V4)")
+    ap.add_argument("--teacher-weights", nargs=3, type=float, metavar=("HEURISTIC", "MINIMAX", "MCTS"),
+                    help="Optional positive source weights, e.g. 0.6 1.5 0.9 (V4.1). Requires teacher_ids.")
     ap.add_argument("--overwrite", action="store_true",
                     help="Explicitly replace the checkpoint at --out")
     args = ap.parse_args()
     if (args.epochs < 1 or args.patience < 0 or args.batch_size < 1
             or not 0 < args.val_split < 1 or args.lr <= 0 or args.weight_decay < 0):
         ap.error("Invalid training parameters; check epochs, patience, batch-size, lr, weight-decay, val-split")
+    if args.teacher_weights is not None:
+        vals = np.asarray(args.teacher_weights, dtype=np.float64)
+        if not np.isfinite(vals).all() or (vals <= 0).any():
+            ap.error("--teacher-weights values must be positive and finite")
     train(args)
 
 
