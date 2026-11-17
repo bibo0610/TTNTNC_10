@@ -10,7 +10,7 @@ from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader, TensorDataset
 
-from agents.cnn_agent import CNNPolicy, masked_logits
+from agents.cnn_agent import ARCHITECTURES, make_policy, masked_logits
 from scripts.cnn_augmentation import augment_d4_batch
 
 
@@ -154,7 +154,8 @@ def train(args):
     if device.type == "cuda" and not torch.cuda.is_available():
         raise ValueError("CUDA is not available on this machine. Use --device cpu.")
 
-    model = CNNPolicy().to(device)
+    architecture = getattr(args, "architecture", "cnn_v1")
+    model = make_policy(architecture).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = nn.CrossEntropyLoss()  # validation remains unweighted, as in V4.0
     teacher_weights_tensor = (torch.tensor(source_weights, dtype=torch.float32, device=device)
@@ -166,6 +167,7 @@ def train(args):
 
     config = {
         "data": str(data_path), "epochs": args.epochs, "patience": args.patience,
+        "architecture": architecture,
         "batch_size": args.batch_size, "lr": args.lr,
         "weight_decay": args.weight_decay, "val_split": args.val_split,
         "seed": args.seed, "device": str(device),
@@ -231,6 +233,7 @@ def train(args):
             stale_epochs = 0
             torch.save({
                 "model_state_dict": model.state_dict(), "epoch": epoch,
+                "architecture": architecture,
                 "val_loss": val_loss, "val_accuracy": val_accuracy,
                 "seed": args.seed, "training_config": config,
                 "dataset_sha256": dataset_sha256,
@@ -256,6 +259,8 @@ def main():
     ap.add_argument("--val-split", type=float, default=0.2)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--device", default="cpu", help="cpu or cuda")
+    ap.add_argument("--architecture", choices=ARCHITECTURES, default="cnn_v1",
+                    help="cnn_v1 preserves V1-V4.1; residual_v1 trains the new V5 model")
     ap.add_argument("--augment-d4", action="store_true",
                     help="Apply random D4 board symmetry to TRAIN batches only (V3.2)")
     ap.add_argument("--drop-shared-val-states", action="store_true",

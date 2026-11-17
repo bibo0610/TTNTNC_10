@@ -9,6 +9,7 @@ from core.othello_engine import get_valid_moves
 DEFAULT_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v1_heuristic.pt"
 MINIMAX_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v2_minimax.pt"
 MCTS_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v3_mcts.pt"
+V5_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v5_residual_final.pt"
 
 
 def encode_state(board, player):
@@ -51,10 +52,72 @@ def masked_logits(logits, mask):
     return logits.masked_fill(~mask.bool(), torch.finfo(logits.dtype).min)
 
 
+class ResidualBlock(nn.Module):
+    """Two 3x3 convolutions and a spatial skip connection (48 channels)."""
+    def __init__(self, channels=48):
+        super().__init__()
+        self.conv1 = nn.Conv2d(channels, channels, 3, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(channels)
+        self.conv2 = nn.Conv2d(channels, channels, 3, padding=1, bias=False)
+        self.bn2 = nn.BatchNorm2d(channels)
+        self.activation = nn.ReLU(inplace=False)
+
+    def forward(self, x):
+        residual = x
+        y = self.activation(self.bn1(self.conv1(x)))
+        y = self.bn2(self.conv2(y))
+        return self.activation(y + residual)
+
+
+class ResidualCNNPolicy(nn.Module):
+    """V5: 48-channel stem + two residual blocks + position-aware 64-logit head.
+
+    Uses the same 3x8x8 encoding and legal-action mask as the original CNNPolicy.
+    No pooling: output neurons preserve position-specific information.
+    """
+    def __init__(self):
+        super().__init__()
+        self.stem = nn.Sequential(
+            nn.Conv2d(3, 48, 3, padding=1, bias=False),
+            nn.BatchNorm2d(48), nn.ReLU(),
+        )
+        self.blocks = nn.Sequential(ResidualBlock(48), ResidualBlock(48))
+        self.head = nn.Sequential(
+            nn.Flatten(), nn.Linear(48 * 8 * 8, 128), nn.ReLU(),
+            nn.Dropout(p=0.1), nn.Linear(128, 64),
+        )
+
+    def forward(self, x):
+        return self.head(self.blocks(self.stem(x)))
+
+
+ARCHITECTURES = ("cnn_v1", "residual_v1")
+
+
+def make_policy(architecture="cnn_v1"):
+    """Create the model explicitly; legacy checkpoints default to CNNPolicy."""
+    if architecture == "cnn_v1":
+        return CNNPolicy()
+    if architecture == "residual_v1":
+        return ResidualCNNPolicy()
+    raise ValueError(f"Unsupported CNN architecture {architecture!r}; expected one of {ARCHITECTURES}")
+
+
+def checkpoint_architecture(data):
+    """Read new metadata or use the unchanged architecture for old checkpoints."""
+    meta = data.get("training_config") or {}
+    architecture = data.get("architecture", meta.get("architecture", "cnn_v1"))
+    if architecture not in ARCHITECTURES:
+        raise ValueError(f"Unsupported checkpoint architecture: {architecture!r}")
+    return architecture
+
+
 def load_policy(checkpoint=DEFAULT_CHECKPOINT, device="cpu"):
-    # Load only trusted checkpoints: use weights_only to avoid arbitrary pickles.
+    """Auto-detect V5; continue supporting all old V1-V4.1 checkpoint files."""
+    # Only load checkpoints created by this project / another trusted source.
     data = torch.load(Path(checkpoint), map_location=device, weights_only=True)
-    model = CNNPolicy().to(device)
+    architecture = checkpoint_architecture(data)
+    model = make_policy(architecture).to(device)
     model.load_state_dict(data["model_state_dict"])
     model.eval()
     return model
@@ -117,3 +180,16 @@ def cnn_mcts_agent(board, player):
     if not get_valid_moves(board, player):
         return None
     return _mcts_cnn_agent()(board, player)
+
+
+@lru_cache(maxsize=1)
+def _residual_cnn_agent():
+    """Load trained V5 on first GUI move only."""
+    return CNNAgent(V5_CHECKPOINT)
+
+
+def cnn_residual_agent(board, player):
+    """V5 Residual CNN; same (board, player) -> move/None API as other agents."""
+    if not get_valid_moves(board, player):
+        return None
+    return _residual_cnn_agent()(board, player)
