@@ -10,6 +10,7 @@ from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
 
 from agents.cnn_agent import CNNPolicy, masked_logits
+from scripts.cnn_augmentation import augment_d4_batch
 
 
 def sha256_file(path):
@@ -92,14 +93,18 @@ def train(args):
         "train_samples": int((~validation).sum()),
         "val_samples": int(validation.sum()),
         "train_games": int(len(game_ids) - val_count), "val_games": int(val_count),
+        "augmentation": "random_d4_train_only" if args.augment_d4 else "none",
     }
     dataset_sha256 = sha256_file(data_path)
+    print(f"Augmentation: {config['augmentation']}; validation remains unchanged")
 
     for epoch in range(1, args.epochs + 1):
         model.train()
         train_sum, seen = 0.0, 0
         for xb, yb, mb in train_loader:
             xb, yb, mb = xb.to(device), yb.to(device), mb.to(device)
+            if args.augment_d4:
+                xb, yb, mb = augment_d4_batch(xb, yb, mb)
             loss = criterion(masked_logits(model(xb), mb), yb)
             optimizer.zero_grad()
             loss.backward()
@@ -152,6 +157,8 @@ def main():
     ap.add_argument("--val-split", type=float, default=0.2)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--device", default="cpu", help="cpu or cuda")
+    ap.add_argument("--augment-d4", action="store_true",
+                    help="Apply random D4 board symmetry to TRAIN batches only (V3.2)")
     ap.add_argument("--overwrite", action="store_true",
                     help="Explicitly replace the checkpoint at --out")
     args = ap.parse_args()
