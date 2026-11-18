@@ -9,6 +9,7 @@ from core.othello_engine import get_valid_moves
 DEFAULT_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v1_heuristic.pt"
 MINIMAX_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v2_minimax.pt"
 MCTS_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v3_mcts.pt"
+V41_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v4_1_weighted_final.pt"
 V5_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v5_residual_final.pt"
 
 
@@ -180,6 +181,19 @@ def cnn_mcts_agent(board, player):
     if not get_valid_moves(board, player):
         return None
     return _mcts_cnn_agent()(board, player)
+
+
+@lru_cache(maxsize=1)
+def _weighted_cnn_agent():
+    """Load V4.1 Weighted Multi-Teacher on first use in the GUI."""
+    return CNNAgent(V41_CHECKPOINT)
+
+
+def cnn_weighted_agent(board, player):
+    """V4.1 Weighted Multi-Teacher policy, returning a legal move or None."""
+    if not get_valid_moves(board, player):
+        return None
+    return _weighted_cnn_agent()(board, player)
 
 
 @lru_cache(maxsize=1)

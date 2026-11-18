@@ -19,7 +19,7 @@ from core.othello_engine import (
 
 from agents.heuristic_agent import heuristic_agent
 from agents.minimax_agent import minimax_agent
-from agents.cnn_agent import cnn_agent, cnn_minimax_agent, cnn_residual_agent
+from agents.cnn_agent import cnn_agent, cnn_minimax_agent, cnn_weighted_agent, cnn_residual_agent
 from agents.mcts_agent import agent as mcts_agent
 
 from history.game_history import GameHistory
@@ -54,6 +54,7 @@ MODE_LABELS = {
     "hvm": "Human vs Minimax",
     "hvcnn": "Human vs CNN (Heuristic)",
     "hvcnnminimax": "Human vs CNN (Minimax)",
+    "hvcnnweighted": "Human vs CNN (V4.1 Weighted)",
     "hvcnnresidual": "Human vs CNN (V5 Residual)",
     "hvmcts": "Human vs MCTS/UCT",
 }
@@ -63,6 +64,7 @@ AI_AGENTS = {
     "hvm": minimax_agent,
     "hvcnn": cnn_agent,
     "hvcnnminimax": cnn_minimax_agent,
+    "hvcnnweighted": cnn_weighted_agent,
     "hvcnnresidual": cnn_residual_agent,
     "hvmcts": mcts_agent,
 }
