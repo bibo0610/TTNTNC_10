@@ -16,17 +16,24 @@ Hệ thống hỗ trợ chơi với AI, lưu lịch sử trận đấu, phát l�
 - Tự động lưu lịch sử trận đấu dưới dạng JSON.
 - Game Replay với các thao tác Previous và Next.
 - Kiểm thử Game Engine bằng pytest.
+- AI sử dụng thuật toán Minimax kết hợp Alpha-Beta Pruning.
+- AI sử dụng Monte Carlo Tree Search (MCTS/UCT).
+- Neural Network (CNN) với các phiên bản huấn luyện từ V1 đến V5.
+- Hỗ trợ nhiều chế độ Human vs AI, bao gồm Heuristic, Minimax, MCTS và CNN.
+- Huấn luyện, đánh giá và so sánh các mô hình CNN bằng nhiều đối thủ và bộ seed khác nhau.
 
 ## 3. Công nghệ
 
 - Python 3
 - Tkinter
 - pytest (dùng cho kiểm thử tự động)
+- NumPy (xử lý dữ liệu trạng thái bàn cờ và dataset).
+- PyTorch (xây dựng, huấn luyện và suy luận mô hình CNN).
 
 ## 4. Cấu trúc project
 
 ```text
-ATHELLO_PRJ/
+OTHELLO_PRJ/
 ├── agents/          # Các tác tử AI
 ├── core/            # Game Engine và Environment
 ├── gui/             # Giao diện
@@ -34,17 +41,30 @@ ATHELLO_PRJ/
 ├── test/            # Kiểm thử
 ├── notebooks/       # Notebook thử nghiệm
 ├── game_logs/       # Lịch sử trận đấu
+├── data/            # Dataset huấn luyện CNN
+├── checkpoints/     # Các mô hình CNN đã huấn luyện
+├── scripts/         # Script sinh dữ liệu, huấn luyện và đánh giá
+├── results/         # Kết quả thực nghiệm
 ├── main.py          # File chạy chính
-└── README.md
+├── README.md
+├── CNN_GUIDE.md
+├── EXPERIMENT_RESULTS_CNN.md  # Kết quả thực nghiệm CNN
+└── requirements-cnn.txt
 ```
 
 ## 5. Hướng dẫn chạy
 
-Mở terminal tại thư mục `ATHELLO_PRJ`.
+Mở terminal tại thư mục `OTHELLO_PRJ`.
+
+Cài đặt các thư viện cần thiết:
+
+```powershell
+python -m pip install -r requirements-cnn.txt
+```
 
 Chạy ứng dụng:
 
-```bash
+```powershell
 python main.py
 ```
 
@@ -62,9 +82,6 @@ python -m test.test_replay
 
 ## 6. Kế hoạch phát triển
 
-- AI cấp 3: Minimax/Alpha-Beta.
-- AI cấp 4: MCTS/UCT.
-- AI cấp 5: Neural Network.
 - Heuristic thích nghi theo giai đoạn trận đấu.
 - Post-game Analysis.
 - Automated Tournament và đánh giá hiệu năng.

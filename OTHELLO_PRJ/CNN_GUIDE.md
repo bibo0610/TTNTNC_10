@@ -1,4 +1,4 @@
-# CNN — Hướng dẫn sinh dữ liệu, huấn luyện và đánh giá V1/V2
+# CNN — Hướng dẫn sinh dữ liệu, huấn luyện và đánh giá
 
 ## 1. Các file và quy trình chính
 
@@ -6,18 +6,20 @@
 | ------------------------------ | ------------------------------------------------------------------------------------------------------- |
 | `scripts/generate_cnn_data.py` | Sinh dữ liệu có giám sát từ Teacher                                                                     |
 | `scripts/train_cnn.py`         | Huấn luyện CNN, chia validation theo trận, Early Stopping, lưu checkpoint tốt nhất theo Validation Loss |
+| `scripts/cnn_augmentation.py`  | Thực hiện các phép biến đổi đối xứng D4 cho CNN V3.2                                                    |
+| `scripts/build_cnn_v4_data.py` | Xây dựng dataset Multi-Teacher cho CNN V4.0 và V4.1                                                     |
 | `scripts/evaluate_cnn.py`      | Cho CNN đấu Random, Heuristic, Minimax, MCTS hoặc CNN khác                                              |
 | `agents/cnn_agent.py`          | `CNNPolicy`, `CNNAgent`, Legal-action Mask và các hàm agent cho GUI                                     |
 | `gui/othello_gui.py`           | Giao diện lựa chọn chế độ chơi                                                                          |
 | `test/`                        | Các bài kiểm thử tự động                                                                                |
 
-Quy trình: **Cài thư viện → Kiểm thử → Sinh dataset V1/V2 → Kiểm tra dataset → Huấn luyện → Kiểm tra checkpoint → Đánh giá → (Tùy chọn) dùng trong GUI.**
+Quy trình: **Cài thư viện → Kiểm thử → Sinh dataset theo phiên bản → Kiểm tra dataset → Huấn luyện → Kiểm tra checkpoint → Đánh giá → (Tùy chọn) dùng trong GUI.**
 
 Đầu vào CNN có kích thước `(3, 8, 8)`; nhãn là vị trí nước đi từ `0` đến `63` (`row * 8 + col`). Legal-action Mask loại các vị trí không hợp lệ. V1 và V2 dùng **cùng kiến trúc CNN** nhưng khác nguồn nhãn Teacher.
 
 ## 2. Chuẩn bị môi trường (Windows)
 
-Mở **CMD hoặc PowerShell tại thư mục gốc `ATHELLO_PRJ`** (thư mục chứa `main.py`). Tất cả lệnh bên dưới chạy tại đây.
+Mở **CMD hoặc PowerShell tại thư mục gốc `OTHELLO_PRJ`** (thư mục chứa `main.py`). Tất cả lệnh bên dưới chạy tại đây.
 
 ```powershell
 python --version
@@ -69,7 +71,7 @@ python -m scripts.generate_cnn_data --teacher minimax --minimax-depth 3 --games 
 
 **Tham số sinh dữ liệu:**
 
-- `--teacher`: `heuristic`, `minimax` hoặc `mcts`; tài liệu này dùng hai lựa chọn đầu.
+- `--teacher`: `heuristic`, `minimax` hoặc `mcts`; mục 3 hướng dẫn Heuristic và Minimax Teacher, trong khi Phụ lục A hướng dẫn thêm MCTS Teacher.
 - `--games`: số trận sinh dữ liệu.
 - `--minimax-depth`: độ sâu tìm kiếm, chỉ áp dụng cho Minimax Teacher.
 - `--seed`: seed cho quá trình tạo dữ liệu.
@@ -246,12 +248,18 @@ Khởi chạy:
 python main.py
 ```
 
-GUI hiện dùng các đường dẫn mặc định trong `agents/cnn_agent.py`:
+GUI sử dụng các checkpoint mặc định được khai báo trong `agents/cnn_agent.py`:
 
-- `DEFAULT_CHECKPOINT`: CNN V1 cũ (`cnn_policy.pt`).
-- `MINIMAX_CHECKPOINT`: CNN V2 cũ (`cnn_v2_minimax.pt`).
+- `DEFAULT_CHECKPOINT`: CNN V1 – Heuristic Teacher (`cnn_v1_heuristic.pt`).
+- `MINIMAX_CHECKPOINT`: CNN V2 – Minimax Teacher (`cnn_v2_minimax.pt`).
+- `V41_CHECKPOINT`: CNN V4.1 – Weighted Multi-Teacher (`cnn_v4_1_weighted_final.pt`).
+- `V5_CHECKPOINT`: CNN V5 – Residual CNN (`cnn_v5_residual_final.pt`).
 
-Nếu muốn GUI dùng checkpoint mới, đổi **chỉ tên file** trong hai hằng số trên thành:
+GUI hiện hỗ trợ lựa chọn trực tiếp CNN V1, CNN V2, CNN V4.1 và CNN V5 thông qua các chế độ Human vs CNN tương ứng.
+
+Nếu muốn sử dụng checkpoint khác, có thể thay đổi tên file trong hằng số tương ứng tại `agents/cnn_agent.py`.
+
+Sau khi chỉnh sửa checkpoint, cần khởi động lại chương trình để mô hình được nạp lại. Việc đánh giá bằng `scripts/evaluate_cnn.py` không yêu cầu thay đổi checkpoint mặc định trong GUI.
 
 ```python
 DEFAULT_CHECKPOINT = Path(__file__).resolve().parents[1] / "checkpoints" / "cnn_v1_heuristic_new.pt"
@@ -262,21 +270,150 @@ Giữ nguyên các hàm `cnn_agent(board, player)`, `cnn_minimax_agent(board, pl
 
 ## 9. Các lỗi thường gặp
 
-| Hiện tượng                                            | Cách xử lý                                                                                                |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| `ModuleNotFoundError: scripts` hoặc `agents`          | Mở terminal ở thư mục chứa `main.py` rồi chạy bằng `python -m ...`                                        |
-| `No module named torch / numpy / pytest`              | Chạy `python -m pip install -r requirements-cnn.txt` trong đúng môi trường Python                         |
-| `unrecognized arguments: --patience / --weight-decay` | Source chưa cập nhật bản `V1_V2_TRAIN_PATCH`/`TRAIN_READY`; kiểm tra `python -m scripts.train_cnn --help` |
-| `Dataset not found`                                   | Chạy bước sinh dữ liệu và kiểm tra đúng đường dẫn `.npz`                                                  |
-| `Checkpoint already exists`                           | Dùng tên file `--out` khác; không tùy tiện dùng `--overwrite`                                             |
-| `FileNotFoundError` khi đánh giá hoặc mở GUI          | Kiểm tra checkpoint tồn tại và đường dẫn đã trỏ đúng tên                                                  |
-| `CUDA is not available`                               | Bỏ `--device cuda` hoặc dùng `--device cpu`                                                               |
-| Validation Loss tăng dù Train Loss giảm               | Có thể overfitting; kiểm tra epoch được chọn theo Validation Loss, không mặc định dùng epoch cuối         |
+| Hiện tượng                                            | Cách xử lý                                                                                                                         |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `ModuleNotFoundError: scripts` hoặc `agents`          | Mở terminal ở thư mục chứa `main.py` rồi chạy bằng `python -m ...`                                                                 |
+| `No module named torch / numpy / pytest`              | Chạy `python -m pip install -r requirements-cnn.txt` trong đúng môi trường Python                                                  |
+| `unrecognized arguments: --patience / --weight-decay` | Kiểm tra phiên bản hiện tại của `scripts/train_cnn.py` và chạy `python -m scripts.train_cnn --help` để xem các tham số được hỗ trợ |
+| `Dataset not found`                                   | Chạy bước sinh dữ liệu và kiểm tra đúng đường dẫn `.npz`                                                                           |
+| `Checkpoint already exists`                           | Dùng tên file `--out` khác; không tùy tiện dùng `--overwrite`                                                                      |
+| `FileNotFoundError` khi đánh giá hoặc mở GUI          | Kiểm tra checkpoint tồn tại và đường dẫn đã trỏ đúng tên                                                                           |
+| `CUDA is not available`                               | Bỏ `--device cuda` hoặc dùng `--device cpu`                                                                                        |
+| Validation Loss tăng dù Train Loss giảm               | Có thể overfitting; kiểm tra epoch được chọn theo Validation Loss, không mặc định dùng epoch cuối                                  |
 
 ## 10. Quy tắc lưu phiên bản và so sánh
 
-- Không đặt trùng đường dẫn dataset/checkpoint giữa V1, V2, V3 hoặc các lần huấn luyện.
+- Không đặt trùng đường dẫn dataset/checkpoint giữa các phiên bản CNN V1–V5 hoặc các lần huấn luyện.
 - Khi đánh giá hai checkpoint, giữ giống nhau số trận, seed, opening plies và cấu hình đối thủ.
 - Ghi rõ nguồn Teacher, độ sâu Minimax, số trận dữ liệu, seed và cấu hình train trong báo cáo sau này.
 - Dataset và checkpoint là các đầu ra của quy trình huấn luyện; không cần sửa Game Engine hay thuật toán Heuristic/Minimax để chạy lại V1/V2.
-- Hướng dẫn này không bao gồm kết quả thực nghiệm có sẵn; mỗi thành viên tự chạy các lệnh đánh giá để thu thập số liệu.
+- Tài liệu này tập trung vào quy trình thực hiện và tái lập các thí nghiệm CNN. Kết quả huấn luyện, đánh giá và so sánh các phiên bản CNN V1–V5 được tổng hợp trong EXPERIMENT_RESULTS_CNN.md.
+
+## Phụ lục A. Hướng dẫn CNN V3–V5
+
+Các lệnh dưới đây được đối chiếu với các script và checkpoint trong project hiện tại.
+
+### A.1. CNN V3 – MCTS Teacher
+
+CNN V3 sử dụng dữ liệu được gán nhãn bởi MCTS với 128 simulations cho mỗi lần lựa chọn nước đi.
+
+Sinh dữ liệu V3.1 – 100 trận:
+
+```powershell
+python -m scripts.generate_cnn_data --teacher mcts --games 100 --mcts-simulations 128 --epsilon 0.15 --seed 42 --out data/cnn_v3_1_mcts_128_reproduced.npz
+```
+
+Lệnh trên sử dụng tên file có hậu tố reproduced nhằm tránh ghi đè dataset chính thức khi thực hiện lại quá trình sinh dữ liệu.
+
+Dataset hiện tại:
+
+- cnn_v3_0_mcts_128_final.npz: dữ liệu từ 50 trận đầu.
+- cnn_v3_1_mcts_128_final.npz: dữ liệu từ 100 trận.
+
+**Huấn luyện V3.0:**
+
+```powershell
+python -m scripts.train_cnn --data data/cnn_v3_0_mcts_128_final.npz --out checkpoints/cnn_v3_0_mcts_128_final.pt --epochs 30 --patience 6 --batch-size 128 --val-split 0.2 --lr 0.0005 --weight-decay 0.0001 --seed 42
+```
+
+**Huấn luyện V3.1:**
+
+```powershell
+python -m scripts.train_cnn --data data/cnn_v3_1_mcts_128_final.npz --out checkpoints/cnn_v3_1_mcts_128_final.pt --epochs 30 --patience 6 --batch-size 128 --val-split 0.2 --lr 0.0005 --weight-decay 0.0001 --seed 42
+```
+
+### A.2. CNN V3.2 – D4 Data Augmentation
+
+CNN V3.2 sử dụng dataset V3.1, áp dụng các phép xoay và đối xứng D4 trong quá trình huấn luyện.
+
+```powershell
+python -m scripts.train_cnn --data data/cnn_v3_1_mcts_128_final.npz --out checkpoints/cnn_v3_2_mcts_d4_final.pt --epochs 30 --patience 6 --batch-size 128 --val-split 0.2 --lr 0.0005 --weight-decay 0.0001 --seed 42 --augment-d4
+```
+
+Tham số --augment-d4 chỉ áp dụng augmentation trên training batches, không biến đổi tập validation.
+
+### A.3. CNN V4.0 – Multi-Teacher Learning
+
+V4.0 kết hợp dữ liệu từ Heuristic, Minimax và MCTS, với số lượng mẫu cân bằng giữa ba nguồn.
+
+Tạo dataset Multi-Teacher:
+
+```powershell
+python -m scripts.build_cnn_v4_data --heuristic data/cnn_v1_heuristic.npz --minimax data/cnn_v2_minimax.npz --mcts data/cnn_v3_1_mcts_128_final.npz --seed 42 --conflicts keep --out data/cnn_v4_multi_teacher_final.npz
+```
+
+Huấn luyện V4.0:
+
+```powershell
+python -m scripts.train_cnn --data data/cnn_v4_multi_teacher_final.npz --out checkpoints/cnn_v4_multi_teacher_final.pt --epochs 30 --patience 6 --batch-size 128 --val-split 0.2 --lr 0.0005 --weight-decay 0.0001 --seed 42 --drop-shared-val-states
+```
+
+Tham số --drop-shared-val-states loại các mẫu validation có trạng thái bàn cờ trùng chính xác với tập training.
+
+### A.4. CNN V4.1 – Weighted Multi-Teacher Learning
+
+V4.1 giữ nguyên dataset V4.0 nhưng áp dụng Weighted Cross-Entropy Loss với trọng số Teacher:
+
+- Heuristic: 0.6
+- Minimax: 1.5
+- MCTS: 0.9
+
+**Huấn luyện V4.1:**
+
+```powershell
+python -m scripts.train_cnn --data data/cnn_v4_multi_teacher_final.npz --out checkpoints/cnn_v4_1_weighted_final.pt --epochs 30 --patience 6 --batch-size 128 --val-split 0.2 --lr 0.0005 --weight-decay 0.0001 --seed 42 --drop-shared-val-states --teacher-weights 0.6 1.5 0.9
+```
+
+Validation Loss vẫn được tính bằng Cross-Entropy thông thường để so sánh với V4.0.
+
+### A.5. CNN V5 – Residual CNN
+
+V5 thử nghiệm kiến trúc Residual CNN với Batch Normalization, Skip Connection và Dropout.
+
+Huấn luyện V5:
+
+```powershell
+python -m scripts.train_cnn --architecture residual_v1 --data data/cnn_v4_multi_teacher_final.npz --out checkpoints/cnn_v5_residual_final.pt --epochs 30 --patience 6 --batch-size 128 --val-split 0.2 --lr 0.0005 --weight-decay 0.0001 --seed 42 --drop-shared-val-states --teacher-weights 0.6 1.5 0.9
+```
+
+V5 sử dụng cùng dataset và Weighted Loss của V4.1 để kiểm tra tác động của việc thay đổi kiến trúc.
+
+### A.6. Đánh giá các phiên bản CNN V3–V5
+
+Các phiên bản được đánh giá với 40 games, opening-plies=8 và hai seed 42, 123.
+
+Đánh giá trước Random, Heuristic và Minimax Depth 2:
+
+Ví dụ đối với V4.1:
+
+```powershell
+python -m scripts.evaluate_cnn --checkpoint checkpoints/cnn_v4_1_weighted_final.pt --opponent all --depth 2 --games 40 --seed 42 --opening-plies 8
+```
+
+Đánh giá trên seed 123:
+
+```powershell
+python -m scripts.evaluate_cnn --checkpoint checkpoints/cnn_v4_1_weighted_final.pt --opponent all --depth 2 --games 40 --seed 123 --opening-plies 8
+```
+
+Đối với V3.0, V3.1, V3.2, V4.0 và V5, chỉ cần thay đường dẫn --checkpoint bằng checkpoint tương ứng.
+
+Đánh giá đối đầu trực tiếp giữa các CNN:
+
+Ví dụ V4.1 đấu V4.0:
+
+```powershell
+python -m scripts.evaluate_cnn --checkpoint checkpoints/cnn_v4_1_weighted_final.pt --opponent cnn --opponent-checkpoint checkpoints/cnn_v4_multi_teacher_final.pt --games 40 --seed 42 --opening-plies 8
+```
+
+Ví dụ V5 đấu V4.1:
+
+```powershell
+python -m scripts.evaluate_cnn --checkpoint checkpoints/cnn_v5_residual_final.pt --opponent cnn --opponent-checkpoint checkpoints/cnn_v4_1_weighted_final.pt --games 40 --seed 42 --opening-plies 8
+```
+
+Có thể thay --seed 42 thành --seed 123 để đánh giá thêm trên các thế cờ mở đầu khác.
+
+Kết quả cần ghi nhận gồm W/D/L, Win Rate, Score Rate và unique_openings. Validation Accuracy phản ánh khả năng dự đoán nhãn Teacher; Score Rate phản ánh hiệu suất thi đấu thực tế.
+
+Lưu ý: Các dataset và checkpoint chính thức đã có trong project. Các lệnh huấn luyện ở phụ lục này dùng để tái lập quy trình; không cần chạy lại khi chỉ muốn đánh giá mô hình. Script huấn luyện cũng không cho ghi đè checkpoint có sẵn nếu không có --overwrite.
