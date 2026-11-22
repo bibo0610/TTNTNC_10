@@ -1,0 +1,46 @@
+{
+  "method": "balanced_without_replacement",
+  "teachers": [
+    "heuristic",
+    "minimax",
+    "mcts"
+  ],
+  "seed": 42,
+  "per_teacher": 5000,
+  "total_samples": 15000,
+  "total_games": 400,
+  "conflict_policy": "keep",
+  "source_unique_encoded_states": 20100,
+  "source_conflicting_states": 84,
+  "cross_teacher_conflicting_states": 55,
+  "sources": [
+    {
+      "teacher": "heuristic",
+      "available_samples": 11995,
+      "eligible_samples": 11995,
+      "selected_samples": 5000,
+      "selected_games": 200,
+      "source_path": "data/cnn_v1_heuristic.npz",
+      "sha256": "3833ae579fea20ecab49092e32e579ca901bf8315469a207b95f6edb7a13fe66"
+    },
+    {
+      "teacher": "minimax",
+      "available_samples": 5948,
+      "eligible_samples": 5948,
+      "selected_samples": 5000,
+      "selected_games": 100,
+      "source_path": "data/cnn_v2_minimax.npz",
+      "sha256": "6390f9719859383968aa3f69d3b904d89b1b758ecd95d95c0ec84aa76e248e07"
+    },
+    {
+      "teacher": "mcts",
+      "available_samples": 5948,
+      "eligible_samples": 5948,
+      "selected_samples": 5000,
+      "selected_games": 100,
+      "source_path": "data/cnn_v3_1_mcts_128_final.npz",
+      "sha256": "0ace0233c280013ae6542070e5f731175b52356406bf0653cce2cf50b84579da"
+    }
+  ],
+  "notes": "teacher_ids 0=Heuristic, 1=Minimax, 2=MCTS; game_ids remapped per source; sample balance does not ensure equal number of unique states"
+}
