@@ -22,6 +22,7 @@ from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+from decimal import Decimal, ROUND_HALF_UP
 
 ROOT = Path(__file__).resolve().parent
 MCTS_CSV = ROOT / 'results' / 'mcts' / 'mcts_tournament_results.csv'
@@ -140,10 +141,17 @@ def draw_44(md):
     ax.set_title('So sánh CNN trước Heuristic Agent')
     ax.grid(axis='y', alpha=.2)
     ax.set_axisbelow(True)
-    for bar, value in zip(bars,rates):
-        ax.text(bar.get_x()+bar.get_width()/2, value+1.05,
-                f'{value:.2f}%'.replace('.',','), ha='center', fontsize=10)
-    fig.text(.52,.002, 'n = số trận đã ghi nhận',
+    for bar, value in zip(bars, rates):
+        rounded = Decimal(str(value)).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+        label = f'{rounded}%'.replace('.', ',')
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            value + 1.05,
+            label,
+            ha='center',
+            fontsize=10
+        )
+    fig.text(.52,.002, 'Mỗi mô hình: 80 trận, gồm seed 42 và 123 (40 trận/seed).',
              ha='center', fontsize=9, color='#555555')
     save_chart(fig,'hinh_4_4_cnn_heuristic.png')
 
