@@ -1,0 +1,21 @@
+agent_a,agent_b,seed,games,opening_plies,unique_openings,depth,mcts_simulations,checkpoint,wins_a,draws,losses_a,score_rate_a_pct,elapsed_seconds
+Random,Heuristic,2026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,0.235622
+Random,Heuristic,3026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,1,0,1,50.0,0.194355
+Random,Minimax D2,2026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,0.71504
+Random,Minimax D2,3026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,0.61503
+Random,MCTS 64,2026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,14.868482
+Random,MCTS 64,3026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,14.345514
+Random,CNN cnn_v4_1_weighted_final,2026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,0.094355
+Random,CNN cnn_v4_1_weighted_final,3026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,0.076576
+Heuristic,Minimax D2,2026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,0.793736
+Heuristic,Minimax D2,3026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,1,0,1,50.0,0.690278
+Heuristic,MCTS 64,2026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,1,0,1,50.0,14.149349
+Heuristic,MCTS 64,3026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,14.366171
+Heuristic,CNN cnn_v4_1_weighted_final,2026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,2,0,0,100.0,0.249347
+Heuristic,CNN cnn_v4_1_weighted_final,3026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,1,0,1,50.0,0.179909
+Minimax D2,MCTS 64,2026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,1,0,1,50.0,14.835485
+Minimax D2,MCTS 64,3026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,15.175779
+Minimax D2,CNN cnn_v4_1_weighted_final,2026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,2,0,0,100.0,0.754427
+Minimax D2,CNN cnn_v4_1_weighted_final,3026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,2,0,0,100.0,0.623649
+MCTS 64,CNN cnn_v4_1_weighted_final,2026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,2,0,0,100.0,14.552977
+MCTS 64,CNN cnn_v4_1_weighted_final,3026,2,8,1,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,2,0.0,16.499316

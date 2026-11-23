@@ -1,0 +1,21 @@
+agent_a,agent_b,seed,games,opening_plies,unique_openings,depth,mcts_simulations,checkpoint,wins_a,draws,losses_a,score_rate_a_pct,elapsed_seconds
+Random,Heuristic,2026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,6,0,44,12.0,4.602276
+Random,Heuristic,3026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,8,1,41,17.0,5.093932
+Random,Minimax D2,2026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,5,1,44,11.0,23.874637
+Random,Minimax D2,3026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,3,0,47,6.0,20.114583
+Random,MCTS 64,2026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,0,0,50,0.0,391.326017
+Random,MCTS 64,3026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,3,1,46,7.0,411.113998
+Random,CNN cnn_v4_1_weighted_final,2026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,4,2,44,10.0,2.519361
+Random,CNN cnn_v4_1_weighted_final,3026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,8,0,42,16.0,2.483305
+Heuristic,Minimax D2,2026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,8,2,40,18.0,22.532883
+Heuristic,Minimax D2,3026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,7,1,42,15.0,23.167227
+Heuristic,MCTS 64,2026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,15,2,33,32.0,378.611045
+Heuristic,MCTS 64,3026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,10,2,38,22.0,346.455941
+Heuristic,CNN cnn_v4_1_weighted_final,2026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,29,2,19,60.0,7.673017
+Heuristic,CNN cnn_v4_1_weighted_final,3026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,25,3,22,53.0,8.252682
+Minimax D2,MCTS 64,2026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,19,0,31,38.0,362.323057
+Minimax D2,MCTS 64,3026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,21,0,29,42.0,361.352874
+Minimax D2,CNN cnn_v4_1_weighted_final,2026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,43,0,7,86.0,30.283034
+Minimax D2,CNN cnn_v4_1_weighted_final,3026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,43,0,7,86.0,34.287377
+MCTS 64,CNN cnn_v4_1_weighted_final,2026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,39,1,10,79.0,450.255343
+MCTS 64,CNN cnn_v4_1_weighted_final,3026,50,8,25,2,64,checkpoints/cnn_v4_1_weighted_final.pt,38,1,11,77.0,465.308005

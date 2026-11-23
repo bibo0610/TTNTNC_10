@@ -1,0 +1,6 @@
+rank,agent,games,wins,draws,losses,score_points,win_rate_pct,score_rate_pct
+1,Minimax D2,16,12,0,4,12.0,75.0,75.0
+1,MCTS 64,16,12,0,4,12.0,75.0,75.0
+3,Heuristic,16,8,0,8,8.0,50.0,50.0
+4,CNN cnn_v4_1_weighted_final,16,7,0,9,7.0,43.75,43.75
+5,Random,16,1,0,15,1.0,6.25,6.25
