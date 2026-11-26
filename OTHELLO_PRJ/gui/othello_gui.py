@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 from copy import deepcopy
 from pathlib import Path
+from functools import partial
+from core.othello_engine import random_agent
 
 from core.othello_engine import (
     init_board,
@@ -20,7 +22,11 @@ from core.othello_engine import (
 from agents.heuristic_agent import heuristic_agent
 from agents.minimax_agent import minimax_agent
 from agents.cnn_agent import cnn_agent, cnn_minimax_agent, cnn_weighted_agent, cnn_residual_agent
-from agents.mcts_agent import agent as mcts_agent
+from agents.mcts_agent import (
+    agent as mcts_agent,
+    mcts_agent as mcts_with_simulations
+)
+
 
 from history.game_history import GameHistory
 from history.game_replay import GameReplay
@@ -43,7 +49,7 @@ BOARD_LIGHT = "#2D805A"
 BOARD_DARK = "#287451"
 BOARD_LINE = "#174B35"
 
-CELL_SIZE = 62
+CELL_SIZE = 60
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 LOG_DIR = PROJECT_ROOT / "game_logs"
@@ -57,6 +63,7 @@ MODE_LABELS = {
     "hvcnnweighted": "Human vs CNN (V4.1 Weighted)",
     "hvcnnresidual": "Human vs CNN (V5 Residual)",
     "hvmcts": "Human vs MCTS/UCT",
+    "aiai": "AI vs AI",
 }
 
 AI_AGENTS = {
@@ -69,6 +76,16 @@ AI_AGENTS = {
     "hvmcts": mcts_agent,
 }
 
+DEMO_AGENTS = {
+    "Random": random_agent,
+    "Heuristic": heuristic_agent,
+    "Minimax D2": partial(minimax_agent, depth=2),
+    "MCTS 64": partial(mcts_with_simulations, simulations=64),
+    "CNN V1": cnn_agent,
+    "CNN V2": cnn_minimax_agent,
+    "CNN V4.1": cnn_weighted_agent,
+    "CNN V5": cnn_residual_agent,
+}
 
 # ============================================================
 # OPTIONAL PILLOW
@@ -129,8 +146,8 @@ class OthelloGUI:
         self.root.title("Othello AI | Strategy Arena")
 
         self.root.configure(bg=BG)
-        self.root.geometry("1020x720")
-        self.root.minsize(950, 680)
+        self.root.geometry("1120x820")
+        self.root.minsize(980, 720)
 
         self.board = init_board()
         self.player = BLACK
@@ -141,6 +158,20 @@ class OthelloGUI:
         )
 
         self.ai_job = None
+
+        self.ai_vs_ai_running = False
+        self.ai_vs_ai_paused = False
+
+        self.black_ai_name = tk.StringVar(
+            value="Heuristic"
+        )
+
+        self.white_ai_name = tk.StringVar(
+            value="Minimax D2"
+        )
+
+        # Thời gian nghỉ giữa hai nước đi (ms)
+        self.demo_delay = 700
 
         self.replay = None
         self.saved_game = None
@@ -191,7 +222,7 @@ class OthelloGUI:
             bordercolor=PANEL_LIGHT,
             lightcolor=PANEL_LIGHT,
             darkcolor=PANEL_LIGHT,
-            padding=8,
+            padding=5,
             font=("Segoe UI", 10)
         )
 
@@ -216,121 +247,75 @@ class OthelloGUI:
     # ========================================================
 
     def create_header(self):
+        header = tk.Frame(self.root, bg=BG)
+        header.pack(fill="x", padx=30, pady=(12, 0))
 
-        header = tk.Frame(
-            self.root,
-            bg=BG
-        )
-
-        header.pack(
-            fill="x",
-            padx=32,
-            pady=(22, 14)
-        )
-
-        title_frame = tk.Frame(
-            header,
-            bg=BG
-        )
-
+        title_frame = tk.Frame(header, bg=BG)
         title_frame.pack(side="left")
-
-        tk.Label(
-            title_frame,
-            text="OTHELLO",
-            font=("Segoe UI", 23, "bold"),
-            bg=BG,
-            fg=TEXT
-        ).pack(side="left")
-
-        tk.Label(
-            title_frame,
-            text="  AI",
-            font=("Segoe UI", 23, "bold"),
-            bg=BG,
-            fg=ACCENT
-        ).pack(side="left")
-
-        tk.Label(
-            header,
-            text="8x8  |  STRATEGY ARENA",
-            font=("Segoe UI", 10),
-            bg=BG,
-            fg=MUTED
-        ).pack(side="right")
+        tk.Label(title_frame, text="OTHELLO", font=("Segoe UI", 22, "bold"),
+                 bg=BG, fg=TEXT).pack(side="left")
+        tk.Label(title_frame, text="  AI", font=("Segoe UI", 22, "bold"),
+                 bg=BG, fg=ACCENT).pack(side="left")
+        tk.Label(header, text="STRATEGY ARENA  /  8 × 8",
+                 font=("Segoe UI", 10), bg=BG, fg=MUTED).pack(side="right", pady=10)
 
     # ========================================================
-    # LAYOUT
+    # LAYOUT: compact cards fit above the pinned footer
     # ========================================================
 
-    
     def create_layout(self):
+        # Footer owns its height; controls are intentionally compact enough
+        # to fit above it at the minimum supported window size.
+        self.status_sidebar = tk.Frame(self.root, bg=BG)
+        self.status_sidebar.pack(side="bottom", fill="x", padx=26, pady=(0, 9))
+        self.create_status_card()
 
-        # Khung chính chứa bàn cờ và bảng điều khiển
-        body = tk.Frame(
-            self.root,
-            bg=BG
-        )
+        self.workspace = tk.Frame(self.root, bg=BG)
+        self.workspace.pack(side="top", fill="both", expand=True, padx=18, pady=(8, 5))
 
-        
-        body.pack(
-            side="top",
-            anchor="n",
-            pady=(55, 0)
-        )
+        content = tk.Frame(self.workspace, bg=BG)
+        # Top-aligned rather than vertically centered: no huge blank band.
+        content.pack(anchor="n")
 
-        # Bàn cờ bên trái
-        self.board_panel = tk.Frame(
-            body,
-            bg=PANEL,
-            padx=20,
-            pady=18
-        )
+        self.board_panel = tk.Frame(content, bg=PANEL, padx=17, pady=14)
+        self.board_panel.grid(row=0, column=0, padx=(0, 13), sticky="n")
 
-        self.board_panel.pack(
-            side="left",
-            anchor="n",
-            padx=(0, 20)
-        )
+        self.sidebar = tk.Frame(content, bg=BG, width=322)
+        self.sidebar.grid(row=0, column=1, sticky="n")
+        self.sidebar.grid_propagate(False)
 
-        # Bảng điều khiển bên phải
-        self.sidebar = tk.Frame(
-            body,
-            bg=BG,
-            width=360
-        )
-
-        self.sidebar.pack(
-            side="left",
-            anchor="n",
-            fill="y"
-        )
-
-        # Tạo các thành phần giao diện
         self.create_board_area()
         self.create_mode_card()
+        self.create_ai_vs_ai_card()
         self.create_replay_card()
-        self.create_status_card()
+        self.refresh_mode_panels()
+
+    def refresh_mode_panels(self):
+        """Only show the AI-versus-AI controller in AI-versus-AI mode."""
+        demo_mode = self.mode.get() == "aiai"
+        if demo_mode:
+            if not self.ai_demo_card.winfo_manager():
+                self.ai_demo_card.pack(fill="x", pady=(0, 7), before=self.replay_card)
+            self.restart_button.config(text="ĐẶT LẠI BÀN CỜ")
+            self.mode_hint.config(text="Chọn hai AI bên dưới để trình diễn.")
+        else:
+            if self.ai_demo_card.winfo_manager():
+                self.ai_demo_card.pack_forget()
+            self.restart_button.config(text="BẮT ĐẦU VÁN MỚI")
+            if self.mode.get() == "hvh":
+                self.mode_hint.config(text="Hai người chơi thay phiên nhau.")
+            else:
+                self.mode_hint.config(text="Bạn cầm Đen khi đấu với AI.")
 
     # ========================================================
     # REUSABLE UI
     # ========================================================
 
-    
-    def create_card(self):
-        card = tk.Frame(
-            self.sidebar,
-            bg=PANEL,
-            width=360,
-            padx=18,
-            pady=16
-        )
-
-        card.pack(
-            fill="x",
-            pady=(0, 14)
-        )
-
+    def create_card(self, parent=None):
+        if parent is None:
+            parent = self.sidebar
+        card = tk.Frame(parent, bg=PANEL, width=322, padx=14, pady=9)
+        card.pack(fill="x", pady=(0, 7))
         return card
 
     def create_button(
@@ -368,309 +353,135 @@ class OthelloGUI:
     # ========================================================
 
     def create_board_area(self):
+        score_frame = tk.Frame(self.board_panel, bg=PANEL)
+        score_frame.pack(fill="x", pady=(0, 8))
 
-        score_frame = tk.Frame(
-            self.board_panel,
-            bg=PANEL
-        )
+        tk.Label(score_frame, text="BLACK", font=("Segoe UI", 10, "bold"),
+                 bg=PANEL, fg=TEXT).pack(side="left")
+        self.score_label = tk.Label(score_frame, text="02  :  02",
+                                    font=("Segoe UI", 21, "bold"),
+                                    bg=PANEL, fg=TEXT)
+        self.score_label.pack(side="left", expand=True)
+        tk.Label(score_frame, text="WHITE", font=("Segoe UI", 10, "bold"),
+                 bg=PANEL, fg=TEXT).pack(side="right")
 
-        score_frame.pack(
-            fill="x",
-            pady=(0, 12)
-        )
-
-        tk.Label(
-            score_frame,
-            text="BLACK",
-            font=("Segoe UI", 10, "bold"),
-            bg=PANEL,
-            fg=TEXT
-        ).pack(side="left")
-
-        self.score_label = tk.Label(
-            score_frame,
-            text="02  :  02",
-            font=("Segoe UI", 19, "bold"),
-            bg=PANEL,
-            fg=TEXT
-        )
-
-        self.score_label.pack(
-            side="left",
-            expand=True
-        )
-
-        tk.Label(
-            score_frame,
-            text="WHITE",
-            font=("Segoe UI", 10, "bold"),
-            bg=PANEL,
-            fg=TEXT
-        ).pack(side="right")
-
-        board_border = tk.Frame(
-            self.board_panel,
-            bg="#123D2C",
-            padx=3,
-            pady=3
-        )
-
+        board_border = tk.Frame(self.board_panel, bg="#123D2C", padx=3, pady=3)
         board_border.pack()
-
-        self.canvas = tk.Canvas(
-            board_border,
-            width=SIZE * CELL_SIZE,
-            height=SIZE * CELL_SIZE,
-            bg=BOARD_LIGHT,
-            highlightthickness=0,
-            cursor="hand2"
-        )
-
+        self.canvas = tk.Canvas(board_border, width=SIZE * CELL_SIZE,
+                                height=SIZE * CELL_SIZE,
+                                bg=BOARD_LIGHT, highlightthickness=0,
+                                cursor="hand2")
         self.canvas.pack()
-
-        self.canvas.bind(
-            "<Button-1>",
-            self.handle_click
-        )
-
-        self.turn_label = tk.Label(
-            self.board_panel,
-            text="Lượt của Đen",
-            font=("Segoe UI", 12, "bold"),
-            bg=PANEL,
-            fg=ACCENT
-        )
-
-        self.turn_label.pack(
-            pady=(15, 0)
-        )
+        self.canvas.bind("<Button-1>", self.handle_click)
+        self.turn_label = tk.Label(self.board_panel, text="Lượt của Đen",
+                                   font=("Segoe UI", 12, "bold"),
+                                   bg=PANEL, fg=ACCENT)
+        self.turn_label.pack(pady=(10, 1))
 
     # ========================================================
     # MODE CARD
     # ========================================================
 
     def create_mode_card(self):
+        self.mode_card = self.create_card()
+        card = self.mode_card
+        tk.Label(card, text="CHẾ ĐỘ CHƠI", font=("Segoe UI", 10, "bold"),
+                 bg=PANEL, fg=MUTED).pack(anchor="w")
+        self.mode_combo = ttk.Combobox(card, textvariable=self.mode_label,
+                                       values=list(MODE_LABELS.values()),
+                                       state="readonly", style="Modern.TCombobox",
+                                       width=29, font=("Segoe UI", 10))
+        self.mode_combo.pack(fill="x", pady=(6, 7))
+        self.mode_combo.bind("<<ComboboxSelected>>", self.change_mode)
 
-        card = self.create_card()
+        self.restart_button = self.create_button(card, "BẮT ĐẦU VÁN MỚI",
+                                                  self.restart_game, primary=True)
+        self.restart_button.pack(fill="x", ipady=5)
+        self.mode_hint = tk.Label(card, text="Hai người chơi thay phiên nhau.",
+                                  font=("Segoe UI", 9), bg=PANEL, fg=MUTED,
+                                  anchor="w")
+        self.mode_hint.pack(fill="x", pady=(6, 0))
 
-        tk.Label(
-            card,
-            text="CHẾ ĐỘ CHƠI",
-            font=("Segoe UI", 10, "bold"),
-            bg=PANEL,
-            fg=MUTED
-        ).pack(anchor="w")
+    def create_ai_vs_ai_card(self):
+        self.ai_demo_card = self.create_card()
+        card = self.ai_demo_card
+        tk.Label(card, text="DEMO AI VS AI", font=("Segoe UI", 10, "bold"),
+                 bg=PANEL, fg=MUTED).pack(anchor="w", pady=(0, 2))
+        tk.Label(card, text="AI QUÂN ĐEN", font=("Segoe UI", 9, "bold"),
+                 bg=PANEL, fg=TEXT).pack(anchor="w", pady=(4, 2))
+        self.black_ai_combo = ttk.Combobox(card, textvariable=self.black_ai_name,
+                                           values=list(DEMO_AGENTS.keys()),
+                                           state="readonly", style="Modern.TCombobox", width=29)
+        self.black_ai_combo.pack(fill="x")
+        tk.Label(card, text="AI QUÂN TRẮNG", font=("Segoe UI", 9, "bold"),
+                 bg=PANEL, fg=TEXT).pack(anchor="w", pady=(5, 2))
+        self.white_ai_combo = ttk.Combobox(card, textvariable=self.white_ai_name,
+                                           values=list(DEMO_AGENTS.keys()),
+                                           state="readonly", style="Modern.TCombobox", width=29)
+        self.white_ai_combo.pack(fill="x")
 
-        self.mode_combo = ttk.Combobox(
-            card,
-            textvariable=self.mode_label,
-            values=list(MODE_LABELS.values()),
-            state="readonly",
-            style="Modern.TCombobox",
-            font=("Segoe UI", 10)
-        )
-
-        self.mode_combo.pack(
-            fill="x",
-            pady=(12, 12)
-        )
-
-        self.mode_combo.bind(
-            "<<ComboboxSelected>>",
-            self.change_mode
-        )
-
-        self.restart_button = self.create_button(
-            card,
-            "BẮT ĐẦU VÁN MỚI",
-            self.restart_game,
-            primary=True
-        )
-
-        self.restart_button.pack(
-            fill="x",
-            ipady=9
-        )
-
-        tk.Label(
-            card,
-            text="Bạn cầm Đen khi đấu với AI.",
-            font=("Segoe UI", 9),
-            bg=PANEL,
-            fg=MUTED
-        ).pack(
-            anchor="w",
-            pady=(12, 0)
-        )
+        self.demo_start_button = self.create_button(card, "BẮT ĐẦU AI VS AI",
+                                                     self.start_ai_vs_ai, primary=True)
+        self.demo_start_button.pack(fill="x", ipady=4, pady=(7, 4))
+        self.demo_pause_button = self.create_button(card, "TẠM DỪNG",
+                                                     self.toggle_ai_vs_ai_pause,
+                                                     state="disabled")
+        self.demo_pause_button.pack(fill="x", ipady=3)
 
     # ========================================================
     # REPLAY CARD
     # ========================================================
 
     def create_replay_card(self):
-
-        card = self.create_card()
-
-        tk.Label(
-            card,
-            text="LỊCH SỬ TRẬN ĐẤU",
-            font=("Segoe UI", 10, "bold"),
-            bg=PANEL,
-            fg=MUTED
-        ).pack(anchor="w")
-
-        self.open_button = self.create_button(
-            card,
-            "Mở file lịch sử (JSON)",
-            self.open_history
-        )
-
-        self.open_button.pack(
-            fill="x",
-            pady=(12, 12),
-            ipady=7
-        )
-
-        controls = tk.Frame(
-            card,
-            bg=PANEL
-        )
-
+        self.replay_card = self.create_card()
+        card = self.replay_card
+        tk.Label(card, text="LỊCH SỬ TRẬN ĐẤU", font=("Segoe UI", 10, "bold"),
+                 bg=PANEL, fg=MUTED).pack(anchor="w")
+        self.open_button = self.create_button(card, "Mở file lịch sử (JSON)",
+                                               self.open_history)
+        self.open_button.pack(fill="x", pady=(7, 6), ipady=4)
+        controls = tk.Frame(card, bg=PANEL)
         controls.pack(fill="x")
-
-        self.previous_button = self.create_button(
-            controls,
-            "◀",
-            self.previous_replay,
-            state="disabled"
-        )
-
-        self.previous_button.pack(
-            side="left",
-            fill="x",
-            expand=True,
-            ipady=6
-        )
-
-        self.replay_count_label = tk.Label(
-            controls,
-            text="— / —",
-            bg=PANEL,
-            fg=TEXT,
-            width=9,
-            font=("Segoe UI", 10)
-        )
-
-        self.replay_count_label.pack(
-            side="left"
-        )
-
-        self.next_button = self.create_button(
-            controls,
-            "▶",
-            self.next_replay,
-            state="disabled"
-        )
-
-        self.next_button.pack(
-            side="left",
-            fill="x",
-            expand=True,
-            ipady=6
-        )
-
-        self.close_replay_button = self.create_button(
-            card,
-            "Đóng Replay",
-            self.close_replay,
-            state="disabled"
-        )
-
-        self.close_replay_button.pack(
-            fill="x",
-            pady=(10, 0),
-            ipady=6
-        )
+        self.previous_button = self.create_button(controls, "◀",
+                                                   self.previous_replay,
+                                                   state="disabled")
+        self.previous_button.pack(side="left", fill="x", expand=True, ipady=4)
+        self.replay_count_label = tk.Label(controls, text="— / —", bg=PANEL,
+                                           fg=TEXT, width=9, font=("Segoe UI", 10))
+        self.replay_count_label.pack(side="left")
+        self.next_button = self.create_button(controls, "▶", self.next_replay,
+                                               state="disabled")
+        self.next_button.pack(side="left", fill="x", expand=True, ipady=4)
+        self.close_replay_button = self.create_button(card, "Đóng Replay",
+                                                      self.close_replay,
+                                                      state="disabled")
+        self.close_replay_button.pack(fill="x", pady=(6, 0), ipady=4)
 
     # ========================================================
     # STATUS CARD
     # ========================================================
 
     def create_status_card(self):
+        card = tk.Frame(self.status_sidebar, bg=PANEL, padx=16, pady=7)
+        card.pack(fill="x")
+        tk.Label(card, text="TRẠNG THÁI", font=("Segoe UI", 10, "bold"),
+                 bg=PANEL, fg=MUTED).pack(side="left", padx=(0, 16))
 
-        card = self.create_card()
-
-        tk.Label(
-            card,
-            text="TRẠNG THÁI",
-            font=("Segoe UI", 10, "bold"),
-            bg=PANEL,
-            fg=MUTED,
-            anchor="w"
-        ).pack(fill="x")
-
-        # Khung cố định kích thước cho thông báo
-        status_container = tk.Frame(
-            card,
-            bg=PANEL,
-            width=280,
-            height=48
-        )
-
-        status_container.pack(
-            fill="x",
-            pady=(10, 0)
-        )
-
-        # kích thước của khung chứa
+        status_container = tk.Frame(card, bg=PANEL, height=27)
+        status_container.pack(side="left", fill="x", expand=True)
         status_container.pack_propagate(False)
+        self.status_label = tk.Label(status_container, text="Sẵn sàng chơi",
+                                     font=("Segoe UI", 10), bg=PANEL, fg=TEXT,
+                                     anchor="w", justify="left")
+        self.status_label.pack(fill="both", expand=True)
 
-        self.status_label = tk.Label(
-            status_container,
-            text="Sẵn sàng chơi",
-            font=("Segoe UI", 11),
-            bg=PANEL,
-            fg=TEXT,
-            anchor="w",
-            justify="left",
-            wraplength=270
-        )
-
-        self.status_label.pack(
-            fill="both",
-            expand=True
-        )
-
-        # Khung cố định cho thông báo lưu log
-        log_container = tk.Frame(
-            card,
-            bg=PANEL,
-            width=280,
-            height=36
-        )
-
-        log_container.pack(
-            fill="x",
-            pady=(4, 0)
-        )
-
+        log_container = tk.Frame(card, bg=PANEL, width=245, height=27)
+        log_container.pack(side="right", padx=(14, 0))
         log_container.pack_propagate(False)
-
-        self.log_label = tk.Label(
-            log_container,
-            text="Log: chưa lưu ván hiện tại",
-            font=("Segoe UI", 9),
-            bg=PANEL,
-            fg=MUTED,
-            anchor="w",
-            justify="left",
-            wraplength=270
-        )
-
-        self.log_label.pack(
-            fill="both",
-            expand=True
-        )
+        self.log_label = tk.Label(log_container, text="Log: chưa lưu ván hiện tại",
+                                  font=("Segoe UI", 9), bg=PANEL, fg=MUTED,
+                                  anchor="e", justify="right")
+        self.log_label.pack(fill="both", expand=True)
 
     # ========================================================
     # DRAW BOARD
@@ -712,8 +523,11 @@ class OthelloGUI:
 
             # Chỉ hiển thị gợi ý cho người chơi.
             if not (
-                self.mode.get() in AI_AGENTS
-                and self.player == WHITE
+                self.mode.get() == "aiai"
+                or (
+                    self.mode.get() in AI_AGENTS
+                    and self.player == WHITE
+                )
             ):
                 for row, col in valid_moves:
 
@@ -774,6 +588,9 @@ class OthelloGUI:
     def handle_click(self, event):
 
         if self.replay is not None:
+            return
+        
+        if self.mode.get() == "aiai":
             return
 
         if is_game_over(self.board):
@@ -842,8 +659,15 @@ class OthelloGUI:
         if is_game_over(self.board):
 
             self.cancel_ai_job()
-            self.finish_and_save_game()
+            self.ai_vs_ai_running = False
+            self.black_ai_combo.config(state="readonly")
+            self.white_ai_combo.config(state="readonly")
 
+            self.demo_pause_button.config(
+                state="disabled"
+            )
+
+            self.finish_and_save_game()
             self.draw_board()
             self.show_result()
             return
@@ -864,14 +688,15 @@ class OthelloGUI:
 
             self.player = -skipped
 
-            messagebox.showinfo(
-                "Bỏ lượt",
-                (
-                    "Đen không có nước đi hợp lệ."
-                    if skipped == BLACK
-                    else "Trắng không có nước đi hợp lệ."
+            if self.mode.get() != "aiai":
+                messagebox.showinfo(
+                    "Bỏ lượt",
+                    (
+                        "Đen không có nước đi hợp lệ."
+                        if skipped == BLACK
+                        else "Trắng không có nước đi hợp lệ."
+                    )
                 )
-            )
 
         self.draw_board()
         self.schedule_ai()
@@ -887,96 +712,143 @@ class OthelloGUI:
             self.root.after_cancel(self.ai_job)
             self.ai_job = None
 
+    
     def schedule_ai(self):
-
         self.cancel_ai_job()
 
-        if (
-            self.mode.get() in AI_AGENTS
-            and self.replay is None
-            and self.player == WHITE
-            and not is_game_over(self.board)
-        ):
-
-            self.ai_job = self.root.after(
-                250,
-                self.ai_move
-            )
-
-    def ai_move(self):
-
-        self.ai_job = None
-
         if self.replay is not None:
-            return
-
-        if self.mode.get() not in AI_AGENTS:
-            return
-
-        if self.player != WHITE:
             return
 
         if is_game_over(self.board):
             return
 
-        agent = AI_AGENTS[self.mode.get()]
+        mode = self.mode.get()
 
-        self.status_label.config(
-            text="AI đang suy nghĩ..."
+        # AI vs AI: tự động chạy cho cả Đen và Trắng
+        if mode == "aiai":
+            if (
+                not self.ai_vs_ai_running
+                or self.ai_vs_ai_paused
+            ):
+                return
+
+            self.ai_job = self.root.after(
+                self.demo_delay,
+                self.ai_move
+            )
+            return
+
+        # Các chế độ Human vs AI hiện tại:
+        # chỉ gọi AI khi đến lượt Trắng.
+        if mode in AI_AGENTS and self.player == WHITE:
+            self.ai_job = self.root.after(
+                250,
+                self.ai_move
+            )
+
+    
+    def ai_move(self):
+        self.ai_job = None
+
+        if self.replay is not None:
+            return
+
+        if is_game_over(self.board):
+            return
+
+        mode = self.mode.get()
+
+        if mode == "aiai":
+            if (
+                not self.ai_vs_ai_running
+                or self.ai_vs_ai_paused
+            ):
+                return
+
+            if self.player == BLACK:
+                agent_name = self.black_ai_name.get()
+            else:
+                agent_name = self.white_ai_name.get()
+
+            agent = DEMO_AGENTS[agent_name]
+            current_player = self.player
+
+        elif mode in AI_AGENTS:
+            if self.player != WHITE:
+                return
+
+            agent_name = MODE_LABELS[mode]
+            agent = AI_AGENTS[mode]
+            current_player = WHITE
+
+        else:
+            return
+
+        colour = (
+            "Đen" if current_player == BLACK else "Trắng"
         )
 
+        self.status_label.config(
+            text=f"{colour}: {agent_name} đang suy nghĩ..."
+        )
         self.root.update_idletasks()
 
+        # Trường hợp hết nước hợp lệ: PASS
+        legal_moves = get_valid_moves(
+            self.board,
+            current_player
+        )
+
+        if not legal_moves:
+            self.history.record(
+                current_player,
+                None,
+                self.board
+            )
+
+            self.player = -current_player
+            self.draw_board()
+            self.schedule_ai()
+            return
+
         try:
+            # Truyền bản sao để agent không làm thay đổi
+            # trạng thái bàn cờ chính.
             action = agent(
-                self.board,
-                WHITE
+                deepcopy(self.board),
+                current_player
             )
 
         except Exception as exc:
+            self.cancel_ai_job()
+            self.ai_vs_ai_running = False
+            self.black_ai_combo.config(state="readonly")
+            self.white_ai_combo.config(state="readonly")
 
-            messagebox.showerror(
-                "Lỗi AI",
-                str(exc)
+            self.demo_pause_button.config(
+                state="disabled"
             )
 
-            self.mode.set("hvh")
-            self.mode_label.set(MODE_LABELS["hvh"])
-
-            self.restart_game()
-            return
-
-        if action is None:
-
-            if not get_valid_moves(
-                self.board,
-                WHITE
-            ):
-
-                self.history.record(
-                    WHITE,
-                    None,
-                    self.board
-                )
-
-                self.player = BLACK
-                self.draw_board()
-
-            else:
-                messagebox.showerror(
-                    "Lỗi AI",
-                    "AI không trả về nước đi hợp lệ."
-                )
-
-            return
-
-        if action not in get_valid_moves(
-            self.board,
-            WHITE
-        ):
             messagebox.showerror(
                 "Lỗi AI",
-                f"AI trả về nước đi không hợp lệ: {action}"
+                f"{agent_name}: {exc}"
+            )
+            return
+
+        if action not in legal_moves:
+            self.cancel_ai_job()
+            self.ai_vs_ai_running = False
+            self.black_ai_combo.config(state="readonly")
+            self.white_ai_combo.config(state="readonly")
+
+            self.demo_pause_button.config(
+                state="disabled"
+            )
+
+            messagebox.showerror(
+                "Lỗi AI",
+                f"{agent_name} trả về nước đi "
+                f"không hợp lệ: {action}"
             )
             return
 
@@ -986,6 +858,53 @@ class OthelloGUI:
     # MODE
     # ========================================================
 
+    def start_ai_vs_ai(self):
+        # Chuyển sang chế độ AI vs AI
+        self.mode.set("aiai")
+        self.mode_label.set(MODE_LABELS["aiai"])
+        self.refresh_mode_panels()
+
+        # Khởi tạo lại bàn cờ và lịch sử
+        self.restart_game()
+
+        self.ai_vs_ai_running = True
+        self.ai_vs_ai_paused = False
+        self.black_ai_combo.config(state="disabled")
+        self.white_ai_combo.config(state="disabled")
+
+        self.demo_pause_button.config(
+            text="TẠM DỪNG",
+            state="normal"
+        )
+
+        self.draw_board()
+        self.schedule_ai()
+
+
+    def toggle_ai_vs_ai_pause(self):
+        if self.mode.get() != "aiai":
+            return
+
+        if not self.ai_vs_ai_running:
+            return
+
+        self.ai_vs_ai_paused = not self.ai_vs_ai_paused
+
+        if self.ai_vs_ai_paused:
+            self.cancel_ai_job()
+
+            self.demo_pause_button.config(
+                text="TIẾP TỤC"
+            )
+            self.status_label.config(
+                text="Demo đã tạm dừng"
+            )
+        else:
+            self.demo_pause_button.config(
+                text="TẠM DỪNG"
+            )
+            self.schedule_ai()
+        
     def change_mode(self, event=None):
 
         selected_label = self.mode_label.get()
@@ -1000,6 +919,7 @@ class OthelloGUI:
         )
 
         self.mode.set(selected_mode)
+        self.refresh_mode_panels()
         self.restart_game()
 
     # ========================================================
@@ -1109,7 +1029,19 @@ class OthelloGUI:
                 text="— / —"
             )
 
-            if (
+            if self.mode.get() == "aiai":
+                if self.ai_vs_ai_paused:
+                    status = "Demo đã tạm dừng"
+                else:
+                    ai_name = (
+                        self.black_ai_name.get()
+                        if self.player == BLACK
+                        else self.white_ai_name.get()
+                    )
+
+                    status = f"Đang đến lượt {ai_name}"
+
+            elif (
                 self.mode.get() in AI_AGENTS
                 and self.player == WHITE
             ):
@@ -1180,6 +1112,16 @@ class OthelloGUI:
 
         self.cancel_ai_job()
 
+        self.ai_vs_ai_running = False
+        self.ai_vs_ai_paused = False
+        self.black_ai_combo.config(state="readonly")
+        self.white_ai_combo.config(state="readonly")
+
+        self.demo_pause_button.config(
+            text="TẠM DỪNG",
+            state="disabled"
+        )
+
         if self.replay is not None:
             self.close_replay()
             self.cancel_ai_job()
@@ -1232,6 +1174,13 @@ class OthelloGUI:
             return
 
         self.cancel_ai_job()
+
+        if self.mode.get() == "aiai":
+            self.ai_vs_ai_paused = True
+
+            self.demo_pause_button.config(
+                text="TIẾP TỤC"
+            )
 
         if self.replay is None:
             self.saved_game = (
