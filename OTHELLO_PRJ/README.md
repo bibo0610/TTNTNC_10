@@ -51,9 +51,10 @@ Neural Network Agent gồm các hướng phát triển chính:
 
 Các mô hình sử dụng Legal-action Mask để giới hạn hành động được lựa chọn trong tập nước đi hợp lệ.
 
+
 ### 2.3. Giao diện trò chơi
 
-Giao diện Tkinter hỗ trợ **9 chế độ chơi**:
+Giao diện được xây dựng bằng **Tkinter**, hỗ trợ **9 chế độ chơi**:
 
 1. Human vs Human.
 2. Human vs Heuristic.
@@ -73,7 +74,18 @@ Trong chế độ **AI vs AI**, người dùng có thể:
 - Theo dõi lượt chơi, tỷ số và kết quả.
 - Tự động lưu lịch sử JSON khi trận đấu kết thúc.
 
-Chế độ AI vs AI cung cấp tám lựa chọn tác tử: Random, Heuristic, Minimax D2, MCTS 64, CNN V1, CNN V2, CNN V4.1 và CNN V5.
+Chế độ AI vs AI cung cấp tám lựa chọn tác tử: **Random, Heuristic, Minimax D2, MCTS 64, CNN V1, CNN V2, CNN V4.1 và CNN V5**.
+
+#### Xử lý bất đồng bộ và khả năng phản hồi của giao diện
+
+Để hạn chế tình trạng giao diện không phản hồi khi AI thực hiện các tác vụ tính toán dài, hệ thống sử dụng **worker thread kết hợp Queue**:
+
+- Thực hiện quá trình suy luận AI trên worker thread, tách khỏi luồng xử lý giao diện Tkinter.
+- Chuyển kết quả qua `Queue` và sử dụng `root.after()` để kiểm tra, cập nhật bàn cờ trên luồng chính.
+- Sử dụng mã định danh lượt tính toán để bỏ qua các kết quả không còn hợp lệ khi trạng thái trận đấu thay đổi.
+- Hỗ trợ tạm dừng và tiếp tục chế độ AI vs AI mà không áp dụng nước đi trong thời gian tạm dừng.
+
+Cơ chế này cải thiện khả năng phản hồi của giao diện nhưng không trực tiếp giảm thời gian suy luận. Những worker thread đã khởi chạy vẫn có thể tiếp tục tính toán sau khi tác vụ bị hủy ở cấp giao diện.
 
 ### 2.4. Game History và Game Replay
 
@@ -141,7 +153,7 @@ OTHELLO_PRJ/
 ├── gui/                     # Giao diện Tkinter
 ├── history/                 # Game History và Game Replay
 ├── test/                    # Bộ kiểm thử tự động
-├── notebooks/               # Notebook nghiên cứu và thử nghiệm
+├── notebooks/               # Notebook khởi tạo và thử nghiệm ban đầu
 ├── scripts/                 # Sinh dữ liệu, huấn luyện, đánh giá, Round-robin
 ├── data/                    # Dataset huấn luyện CNN
 ├── checkpoints/             # Checkpoint mô hình CNN
@@ -206,8 +218,6 @@ Chạy riêng một nhóm kiểm thử, ví dụ Game Engine:
 python -m pytest test/test_engine.py -v
 ```
 
-Kết quả tham chiếu từ phiên bản đã đánh giá: **56 bài kiểm thử thành công**.
-
 ### 5.4. Game Replay
 
 Trong giao diện, chọn `Mở file lịch sử (JSON)` và mở tệp lịch sử cần xem.
@@ -244,8 +254,6 @@ Nhóm tổ chức công việc theo hai hướng:
 
 Các thay đổi mã nguồn được theo dõi bằng Git. Mỗi nhiệm vụ nên được liên kết với commit, kết quả thực nghiệm hoặc tài liệu tương ứng.
 
-Đối với thí nghiệm, mỗi lần chạy cần ghi nhận cấu hình và kết quả thực tế nhằm hỗ trợ việc kiểm tra và tái lập.
-
 ## 8. Hạn chế và hướng phát triển
 
 Các hướng phát triển tiếp theo bao gồm:
@@ -256,7 +264,7 @@ Các hướng phát triển tiếp theo bao gồm:
 - Khảo sát thêm các ngân sách MCTS và chiến lược mô phỏng.
 - Nghiên cứu kết hợp CNN với MCTS, Self-play và Reinforcement Learning.
 - Bổ sung khả năng điều chỉnh thông số thuật toán trực tiếp trên giao diện.
-- Cải thiện khả năng phản hồi của Tkinter khi AI thực hiện những phép tính tốn nhiều thời gian.
+- Tối ưu cơ chế quản lý và hủy các tác vụ AI đang thực thi.
 
 ## 9. Lưu ý
 
