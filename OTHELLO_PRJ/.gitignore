@@ -12,6 +12,7 @@ env/
 .vscode/
 
 # Generated game logs
+game_logs/**/*.json
 game_logs/*.json
 !game_logs/.gitkeep
 
