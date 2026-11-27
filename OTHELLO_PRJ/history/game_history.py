@@ -31,7 +31,11 @@ class GameHistory:
         }
 
     def save(self, filename=None):
-        folder = Path("game_logs")
+        folder = (
+            Path(__file__).resolve().parent.parent
+            / "game_logs"
+        )
+        folder.mkdir(parents=True, exist_ok=True)
         folder.mkdir(exist_ok=True)
 
         if filename is None:
