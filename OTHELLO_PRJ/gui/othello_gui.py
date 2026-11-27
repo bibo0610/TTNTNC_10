@@ -3,6 +3,8 @@ from tkinter import ttk, filedialog, messagebox
 from copy import deepcopy
 from pathlib import Path
 from functools import partial
+from threading import Thread
+from queue import Queue, Empty
 from core.othello_engine import random_agent
 
 from core.othello_engine import (
@@ -158,6 +160,11 @@ class OthelloGUI:
         )
 
         self.ai_job = None
+        # Quản lý tác vụ AI chạy ở worker thread
+        self._ai_results = Queue()
+        self._ai_generation = 0
+        self._ai_inflight = None
+        self._ai_poll_job = None
 
         self.ai_vs_ai_running = False
         self.ai_vs_ai_paused = False
@@ -203,6 +210,7 @@ class OthelloGUI:
         self.create_header()
         self.create_layout()
         self.draw_board()
+        self._poll_ai_results()
 
     # ========================================================
     # STYLES
@@ -706,63 +714,134 @@ class OthelloGUI:
     # ========================================================
 
     def cancel_ai_job(self):
+        # Hủy lịch chờ, vô hiệu hóa kết quả AI cũ.
+        self._ai_generation += 1
+        self._ai_inflight = None
 
         if self.ai_job is not None:
-
             self.root.after_cancel(self.ai_job)
             self.ai_job = None
 
-    
     def schedule_ai(self):
-        self.cancel_ai_job()
+        # Hủy lịch chờ trùng, không hủy worker đang chạy.
+        if self.ai_job is not None:
+            self.root.after_cancel(self.ai_job)
+            self.ai_job = None
 
-        if self.replay is not None:
+        if self._ai_inflight is not None:
             return
 
-        if is_game_over(self.board):
+        if self.replay is not None or is_game_over(self.board):
             return
 
         mode = self.mode.get()
 
-        # AI vs AI: tự động chạy cho cả Đen và Trắng
         if mode == "aiai":
-            if (
-                not self.ai_vs_ai_running
-                or self.ai_vs_ai_paused
-            ):
+            if not self.ai_vs_ai_running or self.ai_vs_ai_paused:
                 return
 
             self.ai_job = self.root.after(
                 self.demo_delay,
                 self.ai_move
             )
-            return
 
-        # Các chế độ Human vs AI hiện tại:
-        # chỉ gọi AI khi đến lượt Trắng.
-        if mode in AI_AGENTS and self.player == WHITE:
+        elif mode in AI_AGENTS and self.player == WHITE:
             self.ai_job = self.root.after(
                 250,
                 self.ai_move
             )
 
-    
+    @staticmethod
+    def _ai_worker(agent, board, player, generation, result_queue):
+        # Worker chỉ tính toán, không được gọi Tkinter.
+        try:
+            action = agent(board, player)
+            result_queue.put((generation, action, None))
+        except Exception as exc:
+            result_queue.put((generation, None, exc))
+
+    def _poll_ai_results(self):
+        # Chạy trong Tkinter Main Thread.
+        try:
+            while True:
+                generation, action, error = self._ai_results.get_nowait()
+
+                # Bỏ qua kết quả từ trận hoặc lượt tính cũ.
+                if generation != self._ai_generation:
+                    continue
+
+                job = self._ai_inflight
+                if job is None or job[0] != generation:
+                    continue
+
+                self._ai_inflight = None
+                _, player, legal_moves, agent_name = job
+
+                if (
+                    self.replay is not None
+                    or self.player != player
+                    or is_game_over(self.board)
+                ):
+                    continue
+
+                if (
+                    self.mode.get() == "aiai"
+                    and (
+                        not self.ai_vs_ai_running
+                        or self.ai_vs_ai_paused
+                    )
+                ):
+                    continue
+
+                if error is not None:
+                    self._show_ai_error(agent_name, str(error))
+                    continue
+
+                if action not in legal_moves:
+                    self._show_ai_error(
+                        agent_name,
+                        f"Nước đi không hợp lệ: {action}"
+                    )
+                    continue
+
+                self.apply_move(action)
+
+        except Empty:
+            pass
+
+        finally:
+            self._ai_poll_job = self.root.after(
+                60,
+                self._poll_ai_results
+            )
+
+    def _show_ai_error(self, agent_name, detail):
+        self.cancel_ai_job()
+        self.ai_vs_ai_running = False
+
+        self.black_ai_combo.config(state="readonly")
+        self.white_ai_combo.config(state="readonly")
+        self.demo_pause_button.config(state="disabled")
+
+        messagebox.showerror(
+            "Lỗi AI",
+            f"{agent_name}: {detail}"
+        )
+
     def ai_move(self):
         self.ai_job = None
 
-        if self.replay is not None:
+        # Không chạy hai worker cho cùng một lượt.
+        if self._ai_inflight is not None:
             return
 
-        if is_game_over(self.board):
+        if self.replay is not None or is_game_over(self.board):
             return
 
         mode = self.mode.get()
 
         if mode == "aiai":
-            if (
-                not self.ai_vs_ai_running
-                or self.ai_vs_ai_paused
-            ):
+            if not self.ai_vs_ai_running or self.ai_vs_ai_paused:
                 return
 
             if self.player == BLACK:
@@ -784,21 +863,12 @@ class OthelloGUI:
         else:
             return
 
-        colour = (
-            "Đen" if current_player == BLACK else "Trắng"
-        )
-
-        self.status_label.config(
-            text=f"{colour}: {agent_name} đang suy nghĩ..."
-        )
-        self.root.update_idletasks()
-
-        # Trường hợp hết nước hợp lệ: PASS
         legal_moves = get_valid_moves(
             self.board,
             current_player
         )
 
+        # Xử lý PASS trước khi chạy worker.
         if not legal_moves:
             self.history.record(
                 current_player,
@@ -811,48 +881,35 @@ class OthelloGUI:
             self.schedule_ai()
             return
 
-        try:
-            # Truyền bản sao để agent không làm thay đổi
-            # trạng thái bàn cờ chính.
-            action = agent(
+        colour = "Đen" if current_player == BLACK else "Trắng"
+
+        self.status_label.config(
+            text=f"{colour}: {agent_name} đang suy nghĩ..."
+        )
+
+        # Đánh dấu lượt tính mới.
+        self._ai_generation += 1
+        generation = self._ai_generation
+
+        self._ai_inflight = (
+            generation,
+            current_player,
+            tuple(legal_moves),
+            agent_name
+        )
+
+        # Chạy AI trên bản sao bàn cờ.
+        Thread(
+            target=self._ai_worker,
+            args=(
+                agent,
                 deepcopy(self.board),
-                current_player
-            )
-
-        except Exception as exc:
-            self.cancel_ai_job()
-            self.ai_vs_ai_running = False
-            self.black_ai_combo.config(state="readonly")
-            self.white_ai_combo.config(state="readonly")
-
-            self.demo_pause_button.config(
-                state="disabled"
-            )
-
-            messagebox.showerror(
-                "Lỗi AI",
-                f"{agent_name}: {exc}"
-            )
-            return
-
-        if action not in legal_moves:
-            self.cancel_ai_job()
-            self.ai_vs_ai_running = False
-            self.black_ai_combo.config(state="readonly")
-            self.white_ai_combo.config(state="readonly")
-
-            self.demo_pause_button.config(
-                state="disabled"
-            )
-
-            messagebox.showerror(
-                "Lỗi AI",
-                f"{agent_name} trả về nước đi "
-                f"không hợp lệ: {action}"
-            )
-            return
-
-        self.apply_move(action)
+                current_player,
+                generation,
+                self._ai_results
+            ),
+            daemon=True
+        ).start()
 
     # ========================================================
     # MODE
